@@ -56,8 +56,8 @@ struct tuple_t_chain {
  * It consists of an array of tuples and a size of the relation.
  */
 struct relation_t {
-    tuple_t * tuples;     // 8 bytes
-    uint64_t  num_tuples; // 8 bytes
+    tuple_t * tuples;     // int64_t = 8 bytes
+    uint64_t  num_tuples; // int64_t = 8 bytes
 };
 
 /**************************** HASHTABLE STRUCTS ****************************/
