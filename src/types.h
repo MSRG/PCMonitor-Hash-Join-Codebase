@@ -96,7 +96,7 @@ struct bucket_buffer_t {
 
 /** Holds the join results of a thread */
 struct threadresult_t {
-    int  nresults;
+    int      nresults;
     void *   results;
     uint32_t threadid;
 };
@@ -106,6 +106,20 @@ struct result_t {
     int64_t          totalresults;
     threadresult_t * resultlist;
     int              nthreads;
+};
+
+
+/**************************** QUEUE STRUCTS ****************************/
+
+struct queueTask_ {
+//    relation_t * relR;
+//    relation_t * relS;
+//    std::function<void()> function;
+//    void (ThreadPool::*)(queueTask&) function;
+    void *       function;
+    int          size;
+    int          startTupleIndex;
+    int          endTupleIndex;
 };
 
 

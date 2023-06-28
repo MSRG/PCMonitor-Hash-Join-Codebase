@@ -15,8 +15,11 @@
 
 #include "join.h"
 #include "join_params.h"         /* constant parameters */
-//#include "affinity.h"           /* pthread_attr_setaffinity_np */
+#include "cpu_mapping.h"        /* get_cpu_id */
+#include "thread_pool.h"
+#include "queue.h"
 
+//pthread_barrier_t barrier;
 typedef struct arg_t arg_t;
 
 #ifndef NEXT_POW_2
@@ -42,7 +45,7 @@ struct arg_t {
     hashtable_t *ht;
     relation_t *relR;
     relation_t *relS;
-//    pthread_barrier_t * barrier;
+    pthread_barrier_t * barrier;
 //    int64_t             num_results;
 //    int                 num_threads;
     threadresult_t *threadResults; /* results of the thread */
@@ -65,21 +68,13 @@ void allocate_hashtable(hashtable_t ** ppht, uint32_t nbuckets) {
     NEXT_POW_2((ht->num_buckets));
 
     // Allocate hashtable buckets cache line aligned.
-    //  posix_memalign(void **memptr, size_t alignment, size_t size); [Option End]
+    // posix_memalign(void **memptr, size_t alignment, size_t size); [Option End]
     // Allocate (ht->num_buckets * sizeof(bucket_t)) bytes and place the address of the allocated memory
     // in (void**)&ht->buckets. The address of the allocated memory will be a multiple of CACHE_LINE_SIZE.
     if (posix_memalign((void**)&ht->buckets, CACHE_LINE_SIZE, ht->num_buckets * sizeof(bucket_t))) {
         perror("Aligned allocation failed!\n");
         exit(EXIT_FAILURE);
     }
-
-    /** Not an elegant way of passing whether we will numa-localize, but this
-        feature is experimental anyway. */
-//    if (numalocalize) {
-//        tuple_t * mem = (tuple_t *) ht->buckets;
-//        uint32_t ntuples = (ht->num_buckets*sizeof(bucket_t))/sizeof(tuple_t);
-//        numa_localize(mem, ntuples, nthreads);
-//    }
 
     // ht->buckets: pointer to block of memory to fill
     // 0: value to set
@@ -94,11 +89,13 @@ void allocate_hashtable(hashtable_t ** ppht, uint32_t nbuckets) {
  * @param param the parameters of the thread, i.e. tid, ht, reln, ...
  * @return
  */
-void * run_thread(void * param) {
-        arg_t * args = (arg_t*) param;
-
-        std::cout << "hi from thread " << args->tid << std::endl;
-}
+//void * run_thread(void * param) {
+//        arg_t * args = (arg_t*) param;
+//
+//        std::cout << "hi from thread " << args->tid << std::endl;
+//
+//        pthread_barrier_wait(args->barrier);
+//}
 
 /**
  * @param param the parameters of the thread, i.e. tid, ht, reln, ...
@@ -188,28 +185,44 @@ void * run_thread(void * param) {
 
 
 result_t * join(relation_t *relR, relation_t *relS, int skew) {
+    int nthreads = 1;
+    int taskSize = 50;
+
+    Queue queue(relR->num_tuples, relS->num_tuples, taskSize, relR, relS);
+
+    ThreadPool threadPool(nthreads, queue, relR, relS);
+    threadPool.start();
+
+    return NULL;
 
     int i, rv;
-    int nthreads = 16;
     int64_t result = 0;
     int32_t numR, numS, numRthr, numSthr, numRthrOutlier, numSthrOutlier; // total and per thread num.
     int32_t numTuplesR, numTuplesS, numPartitionsR, numPartitionsS;
-    // TODO: uncomment on linux.
-//    cpu_set_t set;                        // Linux struct representing set of CPUs.
+    cpu_set_t set;                        // Linux struct representing set of CPUs.
     pthread_attr_t attr;
     arg_t args[nthreads];
     pthread_t tid[nthreads];
+    pthread_barrier_t barrier;
 
-    // Hashtable Init.
+    // Hashtable Initialization.
     hashtable_t * ht;
     uint32_t nbuckets = (relR->num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
-    // TODO: uncomment on linux.
-//    allocate_hashtable(&ht, nbuckets);
+    allocate_hashtable(&ht, nbuckets);
 
-    numTuplesR = relR->num_tuples;
-    numTuplesS = relS->num_tuples;
+//    numTuplesR = relR->num_tuples;
+//    numTuplesS = relS->num_tuples;
     numPartitionsR = 1000;
     numPartitionsS = 1000;
+
+    // Initializes the thread attributes object pointed to by attr with default attribute values.
+    pthread_attr_init(&attr);
+
+    // Initialize thread barrier.
+    if(pthread_barrier_init(&barrier, NULL, nthreads) != 0){
+        printf("Couldn't create the barrier\n");
+        exit(EXIT_FAILURE);
+    }
 
 #ifdef SAVE_JOIN_RESULTS
     result_t * joinresult = 0;
@@ -217,44 +230,36 @@ result_t * join(relation_t *relR, relation_t *relS, int skew) {
     joinresult->resultlist = (threadresult_t *) malloc(sizeof(threadresult_t) * nthreads);
 #endif
 
-//    numRthr = numR / nthreads;
-//    numSthr = numS / nthreads;
-
-    // TODO: uncomment on linux.
-    // Initializes the thread attributes object pointed to by attr with default attribute values.
-//    pthread_attr_init(&attr);
-
-    for (i = 0; i < nthreads; i++) { // 16 threads
-
-        int cpu_idx = i;
-        // TODO: uncomment on linux.
+//    for (i = 0; i < nthreads; i++) { // 16 threads
+//
+//        int cpu_idx = get_cpu_id(i);
 //        CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
 //        CPU_SET(cpu_idx, &set);         // Add CPU cpu to set.
 //        pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &set); // Bind a thread to a specific core.
-
-        // Thread arg set-up.
-        args[i].tid = i;
-        args[i].ht = ht;
-        args[i].relR = relR;
-        args[i].relS = relS;
-        args[i].threadResults = &(joinresult->resultlist[i]);
-
-        rv = pthread_create(&tid[i], NULL, run_thread, (void*)&args[i]);
-
+//
+//        // Thread arg set-up.
+//        args[i].tid = i;
+//        args[i].ht = ht;
+//        args[i].relR = relR;
+//        args[i].relS = relS;
+//        args[i].threadResults = &(joinresult->resultlist[i]);
+//        args[i].barrier = &barrier;
+//
 //        rv = pthread_create(&tid[i], &attr, run_thread, (void*)&args[i]);
-
-        if (rv) {
-            printf("[ERROR] return code from pthread_create() is %d\n", rv);
-            exit(-1);
-        }
-//        else { std::cout << "\nCreated thread with threadID: " << tid[i] << std::endl; }
-    }
-
-//    rv = pthread_barrier_init(&barrier, NULL, nthreads);
-//    if(rv != 0){
-//        printf("Couldn't create the barrier\n");
-//        exit(EXIT_FAILURE);
+//        if (rv) {
+//            printf("[ERROR] return code from pthread_create() is %d\n", rv);
+//            exit(-1);
+//        }
+////        else { std::cout << "\nCreated thread with threadID: " << tid[i] << std::endl; }
 //    }
+//
+//   for (i = 0; i < nthreads; i++) {
+//        pthread_join(tid[i], NULL);
+//        /* sum up results */
+////        result += args[i].num_results;
+//    }
+
+    pthread_barrier_destroy(&barrier);
 
 }
 

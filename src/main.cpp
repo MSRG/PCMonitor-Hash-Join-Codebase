@@ -6,13 +6,13 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <iostream>
-#include <getopt.h>                 /* getopt */
+#include <getopt.h>
 
 // Files:
 #include "types.h"
 #include "config.h"
 #include "join.h"
-//#include "relation_generator.h"
+#include "relation_generator.h"
 
 using namespace std;
 
@@ -33,11 +33,12 @@ int main(int argc, char **argv) {
     relation_t relR;
     relation_t relS;
     result_t * results;
+    uint32_t numThreadsCreateRel = 1;
 
     /* Command line parameters */
     param_t cmd_params;
-    cmd_params.r_size   = 10;
-    cmd_params.s_size   = 10;
+    cmd_params.r_size   = 100;
+    cmd_params.s_size   = 100;
     cmd_params.skew     = 0;
     parse_args(argc, argv, &cmd_params);
 
@@ -47,7 +48,7 @@ int main(int argc, char **argv) {
             (double) sizeof(tuple_t) * cmd_params.r_size/1024.0/1024.0,
             (unsigned long)cmd_params.r_size);
 
-//    create_relation(&relR, cmd_params.r_size, 1, cmd_params.r_size);
+    create_relation(&relR, cmd_params.r_size, cmd_params.r_size);
 
     // Create relation S.
     fprintf(stdout,
@@ -55,13 +56,15 @@ int main(int argc, char **argv) {
             (double) sizeof(tuple_t) * cmd_params.s_size/1024.0/1024.0,
             (unsigned long)cmd_params.s_size);
 
-//    create_relation(&relR, cmd_params.r_size, 1, cmd_params.r_size);
+    create_relation(&relS, cmd_params.s_size, cmd_params.s_size);
+
+    // Initialize threads 14 and 15 to begin PCM monitoring (maybe make them wait
+    // for a signal when hashjoin really begins.
 
     printf("[INFO] Running join algorithm...\n");
 
     results = join(&relR, &relS, cmd_params.skew);
 
-    std::cout << "hhhhi" << endl;
     return 0;
 }
 
