@@ -5,47 +5,47 @@
 #include <thread>
 #include <condition_variable>
 #include <vector>
+#include <queue>
 
-#include "queue.h"
 #include "types.h"
-
-typedef struct arg_thread arg_thread;
-typedef struct queueTask queueTask;
+#include "pcm_monitor.h"
+#include "safe_queue.h"
 
 class ThreadPool {
-    bool done;
-    Queue *queue;
-    pthread_t *tid;
-    relation_t *relR;
-    relation_t *relS;
-    int numThreads, taskSize, remainingTuples, currentTupIndex, phasesRemaining, currentPhase;
+
+
+//        SafeQueue probeQ;
 
     public:
-        ThreadPool(int numThreads, Queue &queue, relation_t *relR_, relation_t *relS_);
+
+//        std::buildQueue<QueueTask> buildQ;
+//        std::probeQueue<QueueTask> probeQ;
+        bool buildDone, probeDone, tsBuild, tsProbe, tsEnd;
+        Relation *relR, *relS;
+        Hashtable *ht;
+        JoinResults *joinResults;
+        SafeQueue *buildQ;
+        Timestamps *ts;
+        struct timeval startTime;
+        int numThreads, taskSize, currentTupIndex, phase;
+        PcmMonitor *pcmMonitor;
+
+        ThreadPool(int numThreads, Relation *relR_, Relation *relS_, Hashtable *ht_, int taskSize_, SafeQueue &buildQ_);
         void start();
-        void run(arg_thread * param);
-        void getTask(queueTask &task);
-        void build(queueTask &task);
-        void probe(queueTask &task);
-        bool tasksRemaining();
+        void buildQueue();
+        void readQueue();
+        void run(ThreadArg * param);
+        void getTask(QueueTask &task);
+        bool buildTasksRemaining();
+        bool probeTasksRemaining();
         void stop();
-//        void QueueJob();
-//        void busy();
+        void saveJoinedRelationToFile();
 
     private:
         std::vector<std::thread> threads;
         std::mutex queue_mutex;                  // Prevents data races to the job queue
+        std::mutex timer_mutex;                  // Prevents data races to the job queue
         std::condition_variable mutex_condition; // Allows threads to wait on new jobs or termination
-};
-
-typedef void (ThreadPool::*PoolMemFn)(queueTask &task);
-
-struct queueTask {
-    int          size;
-    int          startTupleIndex;
-    int          endTupleIndex;
-    PoolMemFn   function;
-
 };
 
 #endif

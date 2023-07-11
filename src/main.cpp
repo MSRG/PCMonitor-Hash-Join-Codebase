@@ -12,65 +12,100 @@
 #include "types.h"
 #include "config.h"
 #include "join.h"
+#include "thread_pool.h"
 #include "relation_generator.h"
+#include "safe_queue.h"
+//#include "pcm_monitor.h"
 
 using namespace std;
 
 /**
  * Data structure for command line arguments.
 */
-struct param_t {
-    uint64_t r_size;
-    uint64_t s_size;
+struct CmdParams {
+    uint64_t rSize;
+    uint64_t sSize;
     double skew;
 };
 
 void print_help();
 
-void parse_args(int argc, char **argv, param_t * cmd_params);
+void parse_args(int argc, char **argv, CmdParams * cmdParams);
 
 int main(int argc, char **argv) {
-    relation_t relR;
-    relation_t relS;
-    result_t * results;
+    Relation relR;
+    Relation relS;
     uint32_t numThreadsCreateRel = 1;
 
     /* Command line parameters */
-    param_t cmd_params;
-    cmd_params.r_size   = 100;
-    cmd_params.s_size   = 100;
-    cmd_params.skew     = 0;
-    parse_args(argc, argv, &cmd_params);
+    CmdParams cmdParams;
+    cmdParams.rSize   = 105;
+    cmdParams.sSize   = 105;
+    cmdParams.skew     = 0;
+    parse_args(argc, argv, &cmdParams);
 
     // Create relation R.
     fprintf(stdout,
             "[INFO] Creating relation R of size = %.3lf, num of tuples = %lu... \n",
-            (double) sizeof(tuple_t) * cmd_params.r_size/1024.0/1024.0,
-            (unsigned long)cmd_params.r_size);
+            (double) sizeof(Tuple) * cmdParams.rSize/1024.0/1024.0,
+            (unsigned long)cmdParams.rSize);
 
-    create_relation(&relR, cmd_params.r_size, cmd_params.r_size);
+    create_relation(&relR, cmdParams.rSize, cmdParams.rSize);
 
     // Create relation S.
     fprintf(stdout,
             "[INFO] Creating relation S of size = %.3lf, num of tuples = %lu... \n",
-            (double) sizeof(tuple_t) * cmd_params.s_size/1024.0/1024.0,
-            (unsigned long)cmd_params.s_size);
+            (double) sizeof(Tuple) * cmdParams.sSize/1024.0/1024.0,
+            (unsigned long)cmdParams.sSize);
 
-    create_relation(&relS, cmd_params.s_size, cmd_params.s_size);
+    create_relation(&relS, cmdParams.sSize, cmdParams.sSize);
 
     // Initialize threads 14 and 15 to begin PCM monitoring (maybe make them wait
     // for a signal when hashjoin really begins.
 
-    printf("[INFO] Running join algorithm...\n");
+    int numThreads = 14;
+    int taskSize = 10;
+    int totalCores = 14;
 
-    results = join(&relR, &relS, cmd_params.skew);
+    SafeQueue buildQ;
 
+    printf("[INFO] Initializing PCM Monitor...\n");
+    PcmMonitor pcmMonitor(numThreads, totalCores);
+    pcmMonitor.setUpMonitoring();
+    pcmMonitor.startMonitorThread();
+
+    printf("[INFO] Initializing Hashtable...\n");
+    Hashtable * ht;
+    uint32_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+    allocate_hashtable(&ht, numBuckets);
+
+    // Start thread 0 on performance counter monitoring, looping.
+
+    // Start thread 1 on monitoring events, making decisions, and signaling threads to stop.
+    // maybe using signals/conditions to let thread continue or to go to wait mode, and then signal
+    // out of wait mode.
+
+    printf("[INFO] Initializing ThreadPool...\n");
+    ThreadPool threadPool(numThreads, &relR, &relS, ht, taskSize, buildQ);
+
+    threadPool.buildQueue();
+    threadPool.readQueue();
+//    return 0;
+
+    threadPool.start();
+
+    printf("[INFO] Stopping ThreadPool...\n");
+    pcmMonitor.setMonitoringToFalse();
+    pcmMonitor.stopMonitoring();
+
+#ifdef SAVE_RELATIONS_TO_FILE
+//    threadPool.saveJoinedRelationToFile();
+#endif
     return 0;
 }
 
 void print_help(const char * progname) {
     printf("Usage: %s [options]\n", progname);
-
     printf("\
     Configuration options, with default values in [] :             \n\
        -n --nthreads=<N>  Number of threads to use <N> [2]                    \n\
@@ -79,8 +114,7 @@ void print_help(const char * progname) {
     \n");
 }
 
-void parse_args(int argc, char **argv, param_t * cmd_params) {
-
+void parse_args(int argc, char **argv, CmdParams * cmdParams) {
     int c;
 
     while(1) {
@@ -112,20 +146,19 @@ void parse_args(int argc, char **argv, param_t * cmd_params) {
                 printf ("\n");
                 break;
             case 'r':
-                cmd_params->r_size = atol(optarg);
+                cmdParams->rSize = atol(optarg);
                 break;
 
             case 's':
-                cmd_params->s_size = atol(optarg);
+                cmdParams->sSize = atol(optarg);
                 break;
             case 'k':
-                cmd_params->skew = atof(optarg);
+                cmdParams->skew = atof(optarg);
                 break;
             default:
                 break;
         }
     }
-
     /* Print any remaining command line arguments (not options). */
     if (optind < argc) {
         printf ("non-option arguments: ");

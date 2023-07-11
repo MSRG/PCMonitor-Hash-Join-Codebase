@@ -52,7 +52,7 @@
 #endif
 
 /** number of tuples fitting into L1 */
-#define L1_CACHE_TUPLES (L1_CACHE_SIZE/sizeof(tuple_t))
+#define L1_CACHE_TUPLES (L1_CACHE_SIZE/sizeof(Tuple))
 
 /** thresholds for skewed partitions in 3-phase parallel join */
 // #ifndef SKEW_HANDLING
@@ -83,11 +83,11 @@
  * Put an odd number of cache lines between partitions in pass-2:
  * Here we put 3 cache lines.
  */
-#define SMALL_PADDING_TUPLES (3 * CACHE_LINE_SIZE/sizeof(tuple_t))
+#define SMALL_PADDING_TUPLES (3 * CACHE_LINE_SIZE/sizeof(Tuple))
 #define PADDING_TUPLES (SMALL_PADDING_TUPLES*(FANOUT_PASS2+1))
 
 /** @warning This padding must be allocated at the end of relation */
-#define RELATION_PADDING (PADDING_TUPLES*FANOUT_PASS1*sizeof(tuple_t))
+#define RELATION_PADDING (PADDING_TUPLES*FANOUT_PASS1*sizeof(Tuple))
 
 /** \endinternal */
 

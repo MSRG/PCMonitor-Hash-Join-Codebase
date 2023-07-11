@@ -9,7 +9,8 @@
 #include <unistd.h> /* sysconf */
 #include <numaif.h> /* get_mempolicy() */
 #include <unistd.h>
-
+#include <iostream>
+#include <fstream>
 #include "cpu_mapping.h"
 
 #define MAX_NODES 512
@@ -27,11 +28,11 @@ static int init_mappings_from_file() {
     int i;
 
     cfg = fopen("cpu-mapping.txt", "r");
+
     if (cfg != NULL) {
         if(fscanf(cfg, "%d", &max_cpus) <= 0) {
             printf("Could not parse cpu-mapping.txt!\n");
         }
-
         for(i = 0; i < max_cpus; i++) {
             if(fscanf(cfg, "%d", &node_mapping[i]) <= 0) {
                 printf("Could not parse cpu-mapping.txt!\n");
@@ -41,7 +42,6 @@ static int init_mappings_from_file() {
         fclose(cfg);
         return 1;
     }
-
     return 0;
 }
 
@@ -49,10 +49,9 @@ static int init_mappings_from_file() {
  * Try custom cpu mapping file first, if does not exist then round-robin
  * initialization among available CPUs reported by the system.
  */
-static void init_mappings()
-{
+static void init_mappings() {
     if (init_mappings_from_file() == 0 ) {
-        printf("\nCOULD NOT READ FROM CPU-MAPPING.TXT!\n");
+        printf("\nCOULD NOT OPEN CPU-MAPPING.TXT!\n");
         int i;
 
         max_cpus  = sysconf(_SC_NPROCESSORS_ONLN);
@@ -61,8 +60,6 @@ static void init_mappings()
         }
     }
 }
-
-/** @} */
 
 /**
  * Returns SMT aware logical to physical CPU mapping for a given thread id.
@@ -84,45 +81,43 @@ int get_cpu_id(int thread_id) {
  node 2 cpus: 2 6 10 14 18 22 26 30 34 38 42 46 50 54 58 62
  node 3 cpus: 3 7 11 15 19 23 27 31 35 39 43 47 51 55 59 63
 */
-#define INTEL_E5 1
-
-static int numa[][16] = {
-        {0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60},
-        {1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61},
-        {2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50, 54, 58, 62},
-        {3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63} };
-
-int
-get_numa_id(int mytid)
-{
-#if INTEL_E5
-    int ret = 0;
-
-    for(int i = 0; i < 4; i++)
-        for(int j = 0; j < 16; j++)
-            if(numa[i][j] == mytid){
-                ret = i;
-                break;
-            }
-
-    return ret;
-#else
-    return 0;
-#endif
-}
-
-int get_num_numa_regions(void) {
-    /* TODO: FIXME automate it from the system config. */
-#if INTEL_E5
-    return 4;
-#else
-    return 1;
-#endif
-}
-
-int get_numa_node_of_address(void * ptr) {
-    int numa_node = -1;
-    get_mempolicy(&numa_node, NULL, 0, ptr, MPOL_F_NODE | MPOL_F_ADDR);
-    return numa_node;
-}
-
+//#define INTEL_E5 1
+//
+//static int numa[][16] = {
+//        {0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60},
+//        {1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61},
+//        {2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50, 54, 58, 62},
+//        {3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63} };
+//
+//int get_numa_id(int mytid) {
+//#if INTEL_E5
+//    int ret = 0;
+//
+//    for(int i = 0; i < 4; i++)
+//        for(int j = 0; j < 16; j++)
+//            if(numa[i][j] == mytid){
+//                ret = i;
+//                break;
+//            }
+//
+//    return ret;
+//#else
+//    return 0;
+//#endif
+//}
+//
+//int get_num_numa_regions(void) {
+//    /* TODO: FIXME automate it from the system config. */
+//#if INTEL_E5
+//    return 4;
+//#else
+//    return 1;
+//#endif
+//}
+//
+//int get_numa_node_of_address(void * ptr) {
+//    int numa_node = -1;
+//    get_mempolicy(&numa_node, NULL, 0, ptr, MPOL_F_NODE | MPOL_F_ADDR);
+//    return numa_node;
+//}
+//

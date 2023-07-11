@@ -6,8 +6,16 @@
 #define POOL_HASHJOIN_PCM_JOIN_H
 
 #include "types.h"
+#include "tuple_buffer.h"
 
-result_t * join(relation_t *relR, relation_t *relS, int skew);
+void allocate_hashtable(Hashtable ** ppht, uint32_t nbuckets);
 
+void init_bucket_buffer(BucketBuffer ** ppbuf);
+
+void free_bucket_buffer(BucketBuffer * buf);
+
+void build(ThreadArg &args);
+
+void probe(ThreadArg &args);
 
 #endif //POOL_HASHJOIN_PCM_JOIN_H

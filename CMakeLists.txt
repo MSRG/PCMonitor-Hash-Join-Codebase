@@ -7,18 +7,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_compile_options(-std=c++11)
 
-#include_directories(/home/sofia/Projects/CloudDB/pcm/src)
+include_directories(/home/sofia/Projects/CloudDB/pcm/src)
 
-#add_library(pcm SHARED IMPORTED)
-#set_property(TARGET pcm PROPERTY IMPORTED_LOCATION "/home/sofia/Projects/CloudDB/pcm/build/lib/libpcm.so")
+add_library(pcm SHARED IMPORTED)
+set_property(TARGET pcm PROPERTY IMPORTED_LOCATION "/home/sofia/Projects/CloudDB/pcm/build/lib/libpcm.so")
 
 add_subdirectory(src)
 
 set(SOURCES
-        src/queue.h
-        src/queue.cpp
+        src/safe_queue.h
+        src/safe_queue.cpp
+        src/tuple_buffer.h
+        src/lock.h
         src/thread_pool.h
         src/thread_pool.cpp
+        src/pcm_monitor.cpp
+        src/pcm_monitor.h
         src/join_params.h
         src/cpu_mapping.h
         src/cpu_mapping.cpp
@@ -44,7 +48,7 @@ target_include_directories(
 
 target_link_libraries(
         Pool-HashJoin-PCM
-#        pcm
+        pcm
         pthread
         numa
 )

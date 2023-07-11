@@ -11,6 +11,7 @@
 #include <time.h>               /* time() */
 #include <unistd.h>             /* getpagesize() */
 #include <iostream>
+#include <string>
 
 #include "relation_generator.h"
 #include "cpu_mapping.h"        /* get_cpu_id() */
@@ -20,15 +21,14 @@
 
 bool rCreated = false;
 
-struct create_arg_t {
+struct RelCreateArg {
     int                 skew;
-    relation_t          rel;
+    Relation          rel;
     int64_t             firstkey;
     int64_t             maxid;
     uint64_t            ridstart;
-    relation_t *        fullrel;
+    Relation *        fullrel;
     volatile void *     locks;
-//    pthread_barrier_t * barrier;
 };
 
 void * alloc_aligned(size_t size) {
@@ -40,7 +40,6 @@ void * alloc_aligned(size_t size) {
         perror("[ERROR] alloc_aligned() failed: out of memory");
         return 0;
     }
-
     return ret;
 }
 
@@ -48,8 +47,8 @@ void * alloc_aligned(size_t size) {
  * Create random unique keys starting from firstkey.
  */
 void * random_unique_gen_thread(void * args) {
-    create_arg_t * arg      = (create_arg_t *) args;
-    relation_t *   rel      = & arg->rel;
+    RelCreateArg * arg      = (RelCreateArg *) args;
+    Relation *   rel      = & arg->rel;
     int64_t        firstkey = arg->firstkey;
     int64_t        maxid    = arg->maxid;
     uint64_t       ridstart = arg->ridstart;
@@ -64,14 +63,12 @@ void * random_unique_gen_thread(void * args) {
         rel->tuples[i].key     = firstkey;
         rel->tuples[i].payload = ridstart + (i+1);
 
-        if(firstkey == maxid)
-            firstkey = 0;
-
+        if(firstkey == maxid) { firstkey = 0; }
         firstkey ++;
     }
 }
 
-void generate_relation(relation_t *rel, int64_t firstkey, int64_t maxid, int64_t ridstart) {
+void generate_relation(Relation *rel, int64_t firstkey, int64_t maxid, int64_t ridstart) {
     uint64_t i;
 
     for (i = 0; i < rel->num_tuples; i++) {
@@ -86,7 +83,7 @@ void generate_relation(relation_t *rel, int64_t firstkey, int64_t maxid, int64_t
 /**
  * Write relation to a file.
  */
-void write_relation(relation_t *rel, char const * filename) {
+void write_relation(Relation *rel, char const * filename) {
     FILE * fp = fopen(filename, "w");
     uint64_t i;
 
@@ -96,7 +93,6 @@ void write_relation(relation_t *rel, char const * filename) {
     }
     fclose(fp);
 }
-#include <string>
 
 /*
 * Create relation using multiple threads.
@@ -104,7 +100,7 @@ void write_relation(relation_t *rel, char const * filename) {
 * @num_tuples: r_size/s_size parameter
 * @maxid: number of threads.
 */
-int create_relation(relation_t *relation, uint64_t num_tuples, uint64_t maxid) {
+int create_relation(Relation *relation, uint64_t num_tuples, uint64_t maxid) {
 
     int rv;
     uint32_t i;
@@ -115,13 +111,12 @@ int create_relation(relation_t *relation, uint64_t num_tuples, uint64_t maxid) {
     uint64_t ntuples_perthr;
     uint64_t ntuples_lastthr;
     int64_t             firstkey;
-//    int64_t             maxid;
     uint64_t            ridstart;
 
     relation->num_tuples = num_tuples;
 
     // We need aligned allocation of items.
-    relation->tuples = (tuple_t*) MALLOC(num_tuples * sizeof(tuple_t));
+    relation->tuples = (Tuple*) MALLOC(num_tuples * sizeof(Tuple));
     if (!relation->tuples) {
         perror("out of memory");
         return -1;
@@ -130,8 +125,6 @@ int create_relation(relation_t *relation, uint64_t num_tuples, uint64_t maxid) {
     firstkey       = (offset + 1) % maxid;
     ridstart       = offset;
     generate_relation(relation, firstkey, maxid, ridstart);
-
-
 
 #ifdef SAVE_RELATIONS_TO_FILE
     char const *filename;
@@ -154,7 +147,7 @@ int create_relation(relation_t *relation, uint64_t num_tuples, uint64_t maxid) {
 * @ nthreads: number of threads
 * @maxid: number of threads.
 */
-int create_relation_multithread(relation_t *relation, uint64_t num_tuples, uint32_t nthreads, uint64_t maxid) {
+int create_relation_multithread(Relation *relation, uint64_t num_tuples, uint32_t nthreads, uint64_t maxid) {
 
     int rv;
     uint32_t i;
@@ -165,7 +158,7 @@ int create_relation_multithread(relation_t *relation, uint64_t num_tuples, uint3
     uint64_t ntuples_perthr;
     uint64_t ntuples_lastthr;
 
-    create_arg_t args[nthreads];    // Custom data struct.
+    RelCreateArg args[nthreads];    // Custom data struct.
     pthread_t tid[nthreads];        // Thread IDs.
     cpu_set_t set;                  // Linux struct representing set of CPUs.
     pthread_attr_t attr;            // Pthread struct representing thread characteristics.
@@ -174,7 +167,7 @@ int create_relation_multithread(relation_t *relation, uint64_t num_tuples, uint3
     relation->num_tuples = num_tuples;
 
     /* we need aligned allocation of items */
-    relation->tuples = (tuple_t*) MALLOC(num_tuples * sizeof(tuple_t));
+    relation->tuples = (Tuple*) MALLOC(num_tuples * sizeof(Tuple));
     if (!relation->tuples) {
         perror("out of memory");
         return -1;
@@ -182,21 +175,15 @@ int create_relation_multithread(relation_t *relation, uint64_t num_tuples, uint3
 
     pagesize        = getpagesize();    // Returns current page size.
     // Calculate how many pages will be needed for relation.
-    npages          = (num_tuples * sizeof(tuple_t)) / pagesize + 1;
+    npages          = (num_tuples * sizeof(Tuple)) / pagesize + 1;
     // Number of pager per thread.
     npages_perthr   = npages / nthreads;
     // Number of tuples per thread.
-    ntuples_perthr  =  npages_perthr * (pagesize/sizeof(tuple_t));
+    ntuples_perthr  =  npages_perthr * (pagesize/sizeof(Tuple));
     if(npages_perthr == 0) { ntuples_perthr = num_tuples / nthreads; }
     ntuples_lastthr = num_tuples - ntuples_perthr * (nthreads-1);
 
     pthread_attr_init(&attr);
-
-//    rv = pthread_barrier_init(&barrier, NULL, nthreads);
-//    if(rv != 0){
-//        printf("[ERROR] Couldn't create the barrier\n");
-//        exit(EXIT_FAILURE);
-//    }
 
     volatile void * locks = (volatile void *)calloc(num_tuples, sizeof(char));
 
@@ -218,7 +205,6 @@ int create_relation_multithread(relation_t *relation, uint64_t num_tuples, uint3
         args[i].rel.num_tuples = (i == nthreads-1) ? ntuples_lastthr : ntuples_perthr;
         args[i].fullrel = relation;
         args[i].locks   = locks;
-//        args[i].barrier = &barrier;
 
         offset += ntuples_perthr;
 
@@ -230,27 +216,16 @@ int create_relation_multithread(relation_t *relation, uint64_t num_tuples, uint3
         }
     }
 
-    for(i = 0; i < nthreads; i++){
+    for (i = 0; i < nthreads; i++) {
         pthread_join(tid[i], NULL);
     }
 
-    /* randomly shuffle elements */
-    /* knuth_shuffle(relation); */
-
     /* clean up */
     free((char*)locks);
-//    pthread_barrier_destroy(&barrier);
 
 #ifdef PERSIST_RELATIONS
-    //    char * const tables[] = {"R.tbl", "S.tbl"};
-//    static int rs = 0;
-//    write_relation(relation, tables[(rs++)%2]);
-    if (rCreated) {
-        write_relation(relation, "S.tbl");
-    } else {
-        write_relation(relation, "R.tbl");
-    }
-
+    if (rCreated) { write_relation(relation, "S.tbl"); }
+    else { write_relation(relation, "R.tbl"); }
 #endif
 
     rCreated = true;

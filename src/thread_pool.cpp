@@ -11,199 +11,274 @@
 #include <sys/time.h>           /* gettimeofday */
 #include <chrono>
 #include <functional>
-
-//#include <mutex>
-//#include <condition_variable>
-
+#include <sys/time.h>           /* gettimeofday */
 #include <vector>
+#include <math.h>       /* ceil */
 
 #include "thread_pool.h"
 #include "cpu_mapping.h"        /* get_cpu_id */
 #include "join_params.h"         /* constant parameters */
-//#include "types.h"
+#include "join.h"
 
 pthread_mutex_t queue_p_lock;
 
-struct arg_thread {
-    int32_t tid;
-    hashtable_t *ht;
-    relation_t *relR;
-    relation_t *relS;
-    Queue *queue;
-    queueTask  *task;
-    pthread_barrier_t *barrier;
-//    int64_t             num_results;
-//    int                 num_threads;
-    threadresult_t *threadResults; /* results of the thread */
+ThreadPool::ThreadPool(int numThreads_, Relation *relR_, Relation *relS_, Hashtable *ht_, int taskSize_, SafeQueue &buildQ_) {
 
-#ifdef MEASURE_LATENCY
-    struct timeval start, buildPhaseEnd, probePhaseEnd, end;
-#endif
-};
-
-ThreadPool::ThreadPool(int nthreads, Queue &queue_, relation_t *relR_, relation_t *relS_) {
-    numThreads = nthreads;
-    pthread_t threadIds[numThreads];
-    tid = threadIds;
-    queue = &queue_;
-    remainingTuples = 1;
+    // Assign constructor arguments to class members.
+    numThreads = numThreads_;
     relR = relR_;
     relS = relS_;
-    taskSize = 10;
+    ht = ht_;
+    taskSize = taskSize_;
+    buildQ = &buildQ_;
 
-    remainingTuples = relR->num_tuples;
-    currentTupIndex = 0;
-    currentPhase = 1;
-    done = false;
+    // Initializations.
+    phase = 1;
+    currentTupIndex = 1;
+    buildDone = false;
+    probeDone = false;
+    tsBuild = false;
+    tsProbe = false;
+    tsEnd = false;
+
+    joinResults = (JoinResults *) malloc(sizeof(JoinResults) * numThreads);
 }
 
-void ThreadPool::build(queueTask &task) {
-    std::cout << "building" << std::endl;
-    std::cout << "R = " << relR->num_tuples << std::endl;
-    return;
+void ThreadPool::buildQueue() {
+
+    double buildTasks =  ceil((double) relR->num_tuples / taskSize);
+    double probeTasks =  ceil((double) relS->num_tuples / taskSize);
+    int start = 0;
+    int end = 0;
+
+    std::cout << "number of build tasks = " << buildTasks << std::endl;
+    std::cout << "number of probe tasks = " << probeTasks << std::endl;
+
+    for (int i = 0; i < buildTasks; i++) {
+        if ((start + taskSize) <= relR->num_tuples) {
+            end = start + (taskSize - 1);
+        } else {
+            end = relR->num_tuples - 1;
+        }
+
+        QueueTask task;
+        task.startTupleIndex = start;
+        task.endTupleIndex = end;
+        task.function = &build;
+
+        // enqueue
+        buildQ->enqueue(task);
+        std::cout << "start = " << start << " end = " << end << "\n" << std::endl;
+        start += taskSize;
+    }
+
 }
 
-void ThreadPool::probe(queueTask &task) {
-    std::cout << "probing" << std::endl;
-    return;
+void ThreadPool::readQueue() {
+
+//    while (!buildQ.isEmpty()) {
+//        QueueTask task = buildQ.dequeue();
+//        std::cout << "start = " << task.startTupleIndex << " end = " << task.endTupleIndex << "\n" << std::endl;
+////        buildQ.pop();
+//
+//    }
+
 }
 
-void ThreadPool::getTask(queueTask &task) {
+
+
+void ThreadPool::getTask(QueueTask &task) {
 
     pthread_mutex_lock(&queue_p_lock);
-    int step;
 
-    step = ((remainingTuples >= taskSize) ? (taskSize) : (remainingTuples));
+    if (phase == 1) { // Building phase, using relR.
 
-    std::cout << "remaining = " << remainingTuples << std::endl;
-    std::cout << "step = " << step << std::endl;
+        task.startTupleIndex = currentTupIndex;
+        task.function = &build;
 
-    task.startTupleIndex = currentTupIndex;
-    task.endTupleIndex = currentTupIndex + step;
-    task.size = step;
-
-    currentTupIndex += step;
-    remainingTuples -= step;
-
-    if (remainingTuples == 0) {
-        std::cout << "remaining was 0, reset to " << relS->num_tuples << std::endl;
-        currentPhase += 1;
-        remainingTuples = relS->num_tuples;
-        currentTupIndex = 0;
-    }
-
-    if (currentPhase == 1) {
-        task.function = &ThreadPool::build;
-        pthread_mutex_unlock(&queue_p_lock);
-        return;
-    }
-    if (currentPhase == 2) {
-        task.function = &ThreadPool::probe;
-        pthread_mutex_unlock(&queue_p_lock);
-        return;
-    }
-    if (currentPhase == 3) {
-        // done!
-        std::cout << "done!!" << std::endl;
-        done = true;
-        pthread_mutex_unlock(&queue_p_lock);
-        return;
-    }
-}
-
-bool ThreadPool::tasksRemaining() {
-    return !done;
-}
-
-
-void ThreadPool::run(arg_thread * args) {
-
-        while (tasksRemaining()) {
-            getTask(*(args->task));
-            (this->*(args->task->function))(*(args->task));
+        if ((currentTupIndex + taskSize) >= relR->num_tuples) { // All relR tuples have been dispatched.
+            currentTupIndex = 1;
+            phase = 2;
+            buildDone = true;
+        } else {
+            currentTupIndex += taskSize;
         }
-        pthread_barrier_wait(args->barrier);
+        pthread_mutex_unlock(&queue_p_lock);
+        return;
+    } else if (phase == 2) { // Probing phase, using relS.
+
+        task.startTupleIndex = currentTupIndex;
+        task.function = &probe;
+
+        if ((currentTupIndex + taskSize) >= relS->num_tuples) { // All relS tuples have been dispatched.
+            probeDone = true;
+        } else {
+            currentTupIndex += taskSize;
+        }
+    }
+    pthread_mutex_unlock(&queue_p_lock);
+    return;
 }
+
+bool ThreadPool::buildTasksRemaining() {
+    return !buildDone;
+}
+
+bool ThreadPool::probeTasksRemaining() {
+    return !probeDone;
+}
+
+void ThreadPool::run(ThreadArg * args) {
+
+    init_bucket_buffer(&args->overflowBuf);
+
+    pthread_barrier_wait(args->barrier);
+    if (args->tid == 0) { gettimeofday(&(ts->startTime), NULL); }
+
+    while (buildQ->dequeue(*(args->task))) {
+
+//        buildQ->dequeue(*(args->task));
+//        args->task = &qTask;
+
+        // Performance Counter check.
+
+//        getTask(*(args->task));
+//        if (!buildQ->isEmpty()) {
+        (args->task->function)(*args);
+//        }
+    }
+
+    return;
+    pthread_barrier_wait(args->barrier);
+    if (args->tid == 0) { gettimeofday(&(ts->buildPhaseEnd), NULL); }
+
+//    while (probeTasksRemaining()) {
+//
+//        // Performance Counter check.
+//
+//        getTask(*(args->task));
+//        (args->task->function)(*args);
+//    }
+//
+//    pthread_barrier_wait(args->barrier);
+//    if (args->tid == 0) { gettimeofday(&ts->endTime, NULL); }
+
+    free_bucket_buffer(args->overflowBuf); // Clean-up the overflow buffers.
+}
+
+
+//void ThreadPool::run(ThreadArg * args) {
+//
+//    init_bucket_buffer(&args->overflowBuf);
+//
+//    pthread_barrier_wait(args->barrier);
+//    if (args->tid == 0) { gettimeofday(&(ts->startTime), NULL); }
+//
+//    while (buildTasksRemaining()) {
+//
+//        // Performance Counter check.
+//
+//        getTask(*(args->task));
+//        (args->task->function)(*args);
+//    }
+//
+//    pthread_barrier_wait(args->barrier);
+//    if (args->tid == 0) { gettimeofday(&(ts->buildPhaseEnd), NULL); }
+//
+//    while (probeTasksRemaining()) {
+//
+//        // Performance Counter check.
+//
+//        getTask(*(args->task));
+//        (args->task->function)(*args);
+//    }
+//
+//    pthread_barrier_wait(args->barrier);
+//    if (args->tid == 0) { gettimeofday(&ts->endTime, NULL); }
+//
+//    free_bucket_buffer(args->overflowBuf); // Clean-up the overflow buffers.
+//}
 
 void ThreadPool::start() {
 
     int i;
-    cpu_set_t set;                        // Linux struct representing set of CPUs.
+    cpu_set_t set;             // Linux struct representing set of CPUs.
     pthread_attr_t attr;
-   // Initializes the thread attributes object pointed to by attr with default attribute values.
     pthread_attr_init(&attr);
     pthread_barrier_t barrier;
-    arg_thread args[numThreads];
-    queueTask tasks[numThreads];
     pthread_t tid[numThreads];
-    void * argument[numThreads];
+
+    ThreadArg args[numThreads];
+    QueueTask tasks[numThreads];
+    BucketBuffer overflowBuf[numThreads];
 
     // Initialize thread barrier.
-    if(pthread_barrier_init(&barrier, NULL, numThreads) != 0) {
+    if (pthread_barrier_init(&barrier, NULL, numThreads) != 0) {
         printf("Couldn't create the barrier\n");
         exit(EXIT_FAILURE);
     }
 
     for (i = 0; i < numThreads; i++) {
-
         int cpu_idx = get_cpu_id(i);
         CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
         CPU_SET(cpu_idx, &set);         // Add CPU cpu to set.
-//        pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &set); // Bind a thread to a specific core.
+
+        ChainedTupleBuffer * chainedTupBuf = chainedtuplebuffer_init();
 
         // Thread arg set-up.
         args[i].tid = i;
-//        args[i].ht = ht;
-//        args[i].relR = relR;
-//        args[i].relS = relS;
-//        args[i].threadResults = &(joinresult->resultlist[i]);
-        args[i].queue = queue;
+        args[i].ht = ht;
+        args[i].relR = relR;
+        args[i].relS = relS;
+        args[i].taskSize = taskSize;
         args[i].task = &tasks[i];
+        args[i].overflowBuf = overflowBuf;
         args[i].barrier = &barrier;
 
-//        std::thread t0([&]() { work(a.val); });
-//        assert(pthread_setaffinity_np(t0.native_handle(), sizeof(cpu_set_t),
-//                                &cpu_set_1) == 0);
+        args[i].threadJoinResults = &(joinResults[i]);
+        args[i].threadJoinResults->chainedTupBuf = chainedTupBuf;
+        args[i].threadJoinResults->numResults = 0;
 
-        int a = 5;
-//        std::thread t1(&ThreadPool::run, this, std::ref(a));
-//        argument[i] = (void*)&args[i];
         threads.emplace_back(&ThreadPool::run, this, &args[i]);
-//        DWORD_PTR dw = SetThreadAffinityMask(threads.back().native_handle(), DWORD_PTR(1) << i);
         int rv = pthread_setaffinity_np(threads.back().native_handle(), sizeof(cpu_set_t), &set);
         if (rv != 0) {
           std::cerr << "Error calling pthread_setaffinity_np: " << rv << "\n";
         }
-
-//        int rv = pthread_create(&tid[i], &attr, start_thread, (void*)this);
-//        if (rv) {
-//            printf("[ERROR] return code from pthread_create() is %d\n", rv);
-//            exit(-1);
-//        }
-//        else { std::cout << "\nCreated thread with threadID: " << tid[i] << std::endl; }
     }
 
-//    t1.join();
+//    pthread_barrier_wait(args->barrier);
+//    saveTimingResults();
 
-    std::cout << "back in main " << std::endl;
-//    stop();
+    stop();
+    pthread_barrier_destroy(&barrier);
+}
 
-    // later
+void ThreadPool::stop() {
     for (std::thread & t : threads) {
         t.join();
     }
     std::cout << "DONE! " << std::endl;
-    pthread_barrier_destroy(&barrier);
-
 }
 
-void ThreadPool::stop() {
-    std::cout << "in stop " << std::endl;
+void ThreadPool::saveJoinedRelationToFile() {
+    std::cout << "Saving timing results to file." << std::endl;
+    std::cout << numThreads << " Threads." << std::endl;
 
+    int i, j, numResults;
+    const char * filename = "result.tbl";
+    FILE * fp = fopen(filename, "w");
 
-   for (int i = 0; i < numThreads; i++) {
-        pthread_join(tid[i], NULL);
-        /* sum up results */
-//        result += args[i].num_results;
+    fprintf(fp, "KEY, R_VAL, S_VAL\n");
+
+    for (i = 0; i < numThreads; i++) {
+        ChainedTupleBuffer * cb = joinResults[i].chainedTupBuf;
+        numResults = joinResults[i].numResults;
+        cb_begin(cb);
+
+        for (j = 0; j < numResults; j++) {
+            ChainTuple * tup = cb_read_next(cb);
+            fprintf(fp, "%ld, %ld, %ld\n", (long)tup->key, (long)tup->rPayload, (long)tup->sPayload);
+        }
     }
+    fclose(fp);
 }
