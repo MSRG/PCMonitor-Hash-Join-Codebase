@@ -25,6 +25,8 @@ using namespace std;
 struct CmdParams {
     uint64_t rSize;
     uint64_t sSize;
+    uint64_t totalCores;
+    uint64_t taskSize;
     double skew;
 };
 
@@ -33,15 +35,19 @@ void print_help();
 void parse_args(int argc, char **argv, CmdParams * cmdParams);
 
 int main(int argc, char **argv) {
+
     Relation relR;
     Relation relS;
-    uint32_t numThreadsCreateRel = 1;
+    SafeQueue buildQ;
+    SafeQueue probeQ;
 
     /* Command line parameters */
     CmdParams cmdParams;
-    cmdParams.rSize   = 105;
-    cmdParams.sSize   = 105;
-    cmdParams.skew     = 0;
+    cmdParams.rSize      = 100000000;
+    cmdParams.sSize      = 100000000;
+    cmdParams.skew       = 0;
+    cmdParams.totalCores = 14;
+    cmdParams.taskSize   = 10;
     parse_args(argc, argv, &cmdParams);
 
     // Create relation R.
@@ -60,17 +66,8 @@ int main(int argc, char **argv) {
 
     create_relation(&relS, cmdParams.sSize, cmdParams.sSize);
 
-    // Initialize threads 14 and 15 to begin PCM monitoring (maybe make them wait
-    // for a signal when hashjoin really begins.
-
-    int numThreads = 14;
-    int taskSize = 10;
-    int totalCores = 14;
-
-    SafeQueue buildQ;
-
     printf("[INFO] Initializing PCM Monitor...\n");
-    PcmMonitor pcmMonitor(numThreads, totalCores);
+    PcmMonitor pcmMonitor(cmdParams.totalCores);
     pcmMonitor.setUpMonitoring();
     pcmMonitor.startMonitorThread();
 
@@ -79,30 +76,26 @@ int main(int argc, char **argv) {
     uint32_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
     allocate_hashtable(&ht, numBuckets);
 
-    // Start thread 0 on performance counter monitoring, looping.
-
-    // Start thread 1 on monitoring events, making decisions, and signaling threads to stop.
-    // maybe using signals/conditions to let thread continue or to go to wait mode, and then signal
-    // out of wait mode.
-
     printf("[INFO] Initializing ThreadPool...\n");
-    ThreadPool threadPool(numThreads, &relR, &relS, ht, taskSize, buildQ);
-
+    ThreadPool threadPool(cmdParams.totalCores, relR, relS, *ht, cmdParams.taskSize, buildQ, probeQ, pcmMonitor);
     threadPool.buildQueue();
-    threadPool.readQueue();
-//    return 0;
-
     threadPool.start();
+
+    //    int a = 10;
+    //    int b = 15;
+    //    threadPool.testFunction(a, b);
 
     printf("[INFO] Stopping ThreadPool...\n");
     pcmMonitor.setMonitoringToFalse();
     pcmMonitor.stopMonitoring();
 
 #ifdef SAVE_RELATIONS_TO_FILE
-//    threadPool.saveJoinedRelationToFile();
+    threadPool.saveJoinedRelationToFile();
 #endif
+
     return 0;
 }
+
 
 void print_help(const char * progname) {
     printf("Usage: %s [options]\n", progname);
@@ -114,16 +107,17 @@ void print_help(const char * progname) {
     \n");
 }
 
+
 void parse_args(int argc, char **argv, CmdParams * cmdParams) {
     int c;
 
     while(1) {
         static struct option long_options[] =
-                {
-                        {"r-size",  required_argument, 0, 'r'},
-                        {"s-size",  required_argument, 0, 's'},
-                        {"skew",    required_argument, 0, 'z'},
-                };
+            {
+                {"r-size",  required_argument, 0, 'r'},
+                {"s-size",  required_argument, 0, 's'},
+                {"skew",    required_argument, 0, 'z'},
+            };
 
         /* getopt_long stores the option index here. */
         int option_index = 0;

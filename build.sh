@@ -1,4 +1,9 @@
 #!/bin/bash
 
-make
-cmake --build ./
+cd build/
+cmake ../
+cmake --build .
+
+# for macOS:
+#make
+#cmake --build ./

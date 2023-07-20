@@ -10,6 +10,7 @@
 #define SAVE_JOIN_RESULTS 1
 #define MEASURE_LATENCY 1
 #define PERF_COUNTERS 0
+#define SAVE_RELATIONS_TO_FILE 1
 
 /** Algorithm Parameters **/
 

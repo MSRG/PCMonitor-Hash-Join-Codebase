@@ -9,6 +9,7 @@
 #include <ctime>
 #include <ratio>
 #include <chrono>
+#include <condition_variable>
 
 #include "config.h"
 
@@ -34,9 +35,7 @@ typedef struct TupleBuffer TupleBuffer;
 
 using namespace std::chrono;
 
-
 /**************************** RELATION STRUCTS ****************************/
-
 
 /**
 * Type definition for a tuple, depending on KEY_8B a tuple can be 16B or 8B.
@@ -145,7 +144,7 @@ struct queueTask_ {
 };
 
 struct ThreadArg {
-    int32_t tid;
+    int tid;
     int taskSize;
     Hashtable *ht;
     Relation *relR;
@@ -155,6 +154,7 @@ struct ThreadArg {
     BucketBuffer *overflowBuf; // Overflow buffer for each thread.
     JoinResults *threadJoinResults;
     ThreadResult *threadResults; // Results of the thread.
+    std::condition_variable condVar;
 };
 
 typedef void (*funcky)(ThreadArg&);

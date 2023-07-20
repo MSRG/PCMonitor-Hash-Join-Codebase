@@ -13,16 +13,10 @@ class SafeQueue {
         SafeQueue();
         void enqueue(QueueTask task);
         bool dequeue(QueueTask &task);
-        bool isEmpty();
+        bool isQueueEmpty();
 
     private:
-        bool empty;
         std::queue<QueueTask> q;
-        mutable std::mutex m;
-        std::mutex queue_m;
-        pthread_mutex_t test_lock;
-
-        std::condition_variable queue_cond;
 };
 
 #endif
