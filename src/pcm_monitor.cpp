@@ -1,11 +1,13 @@
-//#include <sstream>
 #include <iostream>
 #include <fstream>
 
 #include "pcm_monitor.h"
 #include "cpu_mapping.h"        /* get_cpu_id */
+#include "config.h"         /* ENABLE_CORE_PAUSING */
 
 const char * CACHE_CSV = "cache-results.csv";
+const char * IPC_CSV = "IPC-results.csv";
+const char * THREAD_RESULTS_CSV_COPY = "individual-thread-results.csv"; // Defined in thread-pool.cpp
 
 using namespace pcm;
 
@@ -14,7 +16,7 @@ static PCM::CustomCoreEventDescription MyEvents[4];
 static CoreCounterState coreBeforeState[14];
 static CoreCounterState coreAfterState[14];
 
-pthread_mutex_t monitor_lock;
+//pthread_mutex_t monitor_lock;
 
 PcmMonitor::PcmMonitor(int totalCores_) {
     std::cout << "Initializing PCM Monitor." << std::endl;
@@ -25,8 +27,10 @@ PcmMonitor::PcmMonitor(int totalCores_) {
     for (int i = 0; i <= totalCores; i++) {
         threadStop[i] = false;
         threadStrikes[i] = 0;
-        l3CacheStats[i].first = 0;
-        l3CacheStats[i].second = 0;
+        l2CacheStats[i].first = 0;
+        l2CacheStats[i].second = 0;
+        ipcStats[i].first = 0;
+        ipcStats[i].second = 0;
     }
 }
 
@@ -64,29 +68,18 @@ bool PcmMonitor::shouldThreadStop(int id) {
     return threadStop[id];
 }
 
-
 void PcmMonitor::makeStopDecisions() {
-    int maxStrikesTolerance = 5;
-    int maxStrikes = 0;
-    int worstCore = 0;
+    int maxStrikesTolerance = 20;
 
-    for (int i = 0; i < totalCores; i++) {
-        // Find which thread has the most strikes currently.
-        if (threadStrikes[i] > maxStrikes) {
-            maxStrikes = threadStrikes[i];
-            worstCore = i;
-        }
-        // Every thread that has less than tolerance strikes is allowed to run.
-        if (threadStrikes[i] < maxStrikesTolerance) {
+    // NOTE: code 0 is not allowed to stop.
+    for (int i = 1; i < totalCores; i++) {
+        if (threadStrikes[i] > maxStrikesTolerance) {
+            threadStop[i] = true;
+        } else if (threadStrikes[i] <= 0) {
             threadStop[i] = false;
+            cv[i].notify_one(); // in case it is waiting.
         }
     }
-
-    // If the thread with the most strikes currently exceeds tolerance, stop it.
-    if (maxStrikes >= maxStrikesTolerance) {
-        threadStop[worstCore] = true;
-    }
-
 }
 
 /*
@@ -101,13 +94,20 @@ void PcmMonitor::analyzeCacheStats() {
     int worstValue = 0;
     int worstCore = 0;
     int maxStrikes = 5;
+    double ipcThreshold = 2;
 
     for (int i = 0; i < totalCores; i++) {
+
+        if (ipcStats[i].second > ipcThreshold) {
+            threadStrikes[i] += 1;
+        } else if (ipcStats[i].second <= ipcThreshold) {
+            threadStrikes[i] -= 1;
+        }
 
         // CASE A: Difference between previous and current value exceed max allowable diff.
         // Add a strike to each core with a high diff.
         // TODO: could alternatively just stop the core.
-//        if ((l3CacheStats[i].second - l3CacheStats[i].first) > maxDiff) {
+//        if ((l2CacheStats[i].second - l2CacheStats[i].first) > maxDiff) {
 //            threadStrikes[i] += 1;
 //            if (threadStrikes[i] == maxStrikes) {
 //                threadStop[i] = false; // TODO: change to true.
@@ -116,20 +116,21 @@ void PcmMonitor::analyzeCacheStats() {
 
         // CASE B: Current value is higher than pre-defined allowable threshold.
         // Stop the core(s) exceeding the threshold value.
-        // TODO: could add a strike.
-        if (l3CacheStats[i].second > threshold) {
-            threadStrikes[i] += 1;
-        } else {
-            threadStrikes[i] -= 1;
-        }
+//        // TODO: could add a strike.
+//        if (l2CacheStats[i].second > threshold) {
+//            threadStrikes[i] += 1;
+//        } else {
+//            threadStrikes[i] -= 1;
+//        }
 
         // CASE C: Identify which core is performing the worst among all cores.
-//        if (l3CacheStats[i].second > worstValue) {
-//            worstValue = l3CacheStats[i].second;
+//        if (l2CacheStats[i].second > worstValue) {
+//            worstValue = l2CacheStats[i].second;
 //            worstCore = i;
 //        }
     }
 }
+
 
 /*
  * Thread/core 14.
@@ -139,12 +140,12 @@ void PcmMonitor::runMonitoring() {
     while (monitoring) {
         checkpointPerformanceCounters();
         analyzeCacheStats();
+#if ENABLE_CORE_PAUSING==1
         makeStopDecisions();
-        sleep(0.5);
-
-//        std::cout << "monitoring" << std::endl;
+#endif
+//        sleep(0.8);
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
     }
-//    std::cout << "stopped monitoring" << std::endl;
 }
 
 /*
@@ -162,7 +163,17 @@ void PcmMonitor::runAnalyzing() {
  */
 void PcmMonitor::clearCsvFiles() {
     std::ofstream file;
+
+    // Cache file.
     file.open(CACHE_CSV, std::ofstream::out | std::ofstream::trunc);
+    file.close();
+
+    // IPC file.
+    file.open(IPC_CSV, std::ofstream::out | std::ofstream::trunc);
+    file.close();
+
+    // Individual Thread Results file.
+    file.open(THREAD_RESULTS_CSV_COPY, std::ofstream::out | std::ofstream::trunc);
     file.close();
 }
 
@@ -170,7 +181,6 @@ void PcmMonitor::clearCsvFiles() {
  * Saves cache performance counter values into both file and monitor data structure.
  */
 void PcmMonitor::saveCacheValues() {
-    uint32 core = 0;
 
     if (CACHE_CSV) {
         std::fstream file(CACHE_CSV, std::ios::app);
@@ -179,14 +189,30 @@ void PcmMonitor::saveCacheValues() {
             if (!i == 0) { file << ","; }
             int misses = getL2CacheMisses(coreBeforeState[i], coreAfterState[i]);
             file << misses;
-            l3CacheStats[i].first = l3CacheStats[i].second;
-            l3CacheStats[i].second = misses;
+            l2CacheStats[i].first = l2CacheStats[i].second;
+            l2CacheStats[i].second = misses;
         }
         file << "\n";
         file.close();
     }
 }
 
+void PcmMonitor::saveIpcValues() {
+    if (IPC_CSV) {
+        std::fstream file(IPC_CSV, std::ios::app);
+
+        for (int i = 0; i < totalCores; i++) {
+            if (!i == 0) { file << ","; }
+            double ipc = getIPC(coreBeforeState[i], coreAfterState[i]);
+            file << ipc;
+            ipcStats[i].first = ipcStats[i].second;
+            ipcStats[i].second = ipc;
+        }
+        file << "\n";
+        file.close();
+
+    }
+}
 
 /*
  * Update the before and after counter states.
@@ -202,6 +228,7 @@ void PcmMonitor::checkpointPerformanceCounters() {
     }
 
     saveCacheValues();
+    saveIpcValues();
     core = 0;
 
     for (int i = 0; i < totalCores; i++) {
@@ -242,9 +269,8 @@ void PcmMonitor::startMonitorThread() {
 }
 
 void PcmMonitor::joinMonitorThread() {
-    allowAllThreadsToContinue();
+//    allowAllThreadsToContinue();
 
-    std::cout << "joining monitoring threads." << std::endl;
     for (std::thread & t : pcmThreads) {
         t.join();
     }
@@ -256,13 +282,5 @@ void PcmMonitor::setMonitoringToFalse() {
 
 void PcmMonitor::stopMonitoring() {
     joinMonitorThread();
-
-//    uint32 core = 0;
-//    for (int i = 0; i < totalCores; i++) {
-//        coreAfterState[i] = getCoreCounterState(core);
-//        core++;
-//    }
-//    saveCacheValues();
-
     pcmInstance->cleanup();
 }

@@ -5,6 +5,7 @@
 #ifndef POOL_HASHJOIN_PCM_CPU_MAPPING_H
 #define POOL_HASHJOIN_PCM_CPU_MAPPING_H
 
+
 /**
  * @file    cpu_mapping.h
  * @author  Cagri Balkesen <cagri.balkesen@inf.ethz.ch>

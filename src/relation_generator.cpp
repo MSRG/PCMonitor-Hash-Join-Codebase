@@ -19,18 +19,6 @@
 
 #define MALLOC(SZ) alloc_aligned(SZ+RELATION_PADDING) /*malloc(SZ+RELATION_PADDING)*/
 
-bool rCreated = false;
-
-struct RelCreateArg {
-    int                 skew;
-    Relation          rel;
-    int64_t             firstkey;
-    int64_t             maxid;
-    uint64_t            ridstart;
-    Relation *        fullrel;
-    volatile void *     locks;
-};
-
 void * alloc_aligned(size_t size) {
     void * ret;
     int rv;
@@ -41,43 +29,6 @@ void * alloc_aligned(size_t size) {
         return 0;
     }
     return ret;
-}
-
-/**
- * Create random unique keys starting from firstkey.
- */
-void * random_unique_gen_thread(void * args) {
-    RelCreateArg * arg      = (RelCreateArg *) args;
-    Relation *   rel      = & arg->rel;
-    int64_t        firstkey = arg->firstkey;
-    int64_t        maxid    = arg->maxid;
-    uint64_t       ridstart = arg->ridstart;
-    uint64_t i;
-
-    /* for randomly seeding nrand48() */
-    unsigned short state[3] = {0, 0, 0};
-    unsigned int seed       = time(NULL) + * (unsigned int *) pthread_self();
-    memcpy(state, &seed, sizeof(seed));
-
-    for (i = 0; i < rel->num_tuples; i++) {
-        rel->tuples[i].key     = firstkey;
-        rel->tuples[i].payload = ridstart + (i+1);
-
-        if(firstkey == maxid) { firstkey = 0; }
-        firstkey ++;
-    }
-}
-
-void generate_relation(Relation *rel, int64_t firstkey, int64_t maxid, int64_t ridstart) {
-    uint64_t i;
-
-    for (i = 0; i < rel->num_tuples; i++) {
-        rel->tuples[i].key     = firstkey;
-        rel->tuples[i].payload = ridstart + (i+1);
-
-        if(firstkey == maxid) {firstkey = 0; }
-        firstkey ++;
-    }
 }
 
 /**
@@ -95,24 +46,13 @@ void write_relation(Relation *rel, char const * filename) {
 }
 
 /*
-* Create relation using multiple threads.
-* @relation: relR/relS passed by reference to create new relations.
-* @num_tuples: r_size/s_size parameter
-* @maxid: number of threads.
+* Create relation R.
+* @relation: relR passed by reference to create new relations.
+* @num_tuples: r_size parameter
 */
-int create_relation(Relation *relation, uint64_t num_tuples, uint64_t maxid) {
+int create_relation_R(Relation *relation, uint64_t num_tuples) {
 
-    int rv;
     uint32_t i;
-    uint64_t offset = 0;
-    unsigned int pagesize;
-    unsigned int npages;
-    unsigned int npages_perthr;
-    uint64_t ntuples_perthr;
-    uint64_t ntuples_lastthr;
-    int64_t             firstkey;
-    uint64_t            ridstart;
-
     relation->num_tuples = num_tuples;
 
     // We need aligned allocation of items.
@@ -122,113 +62,85 @@ int create_relation(Relation *relation, uint64_t num_tuples, uint64_t maxid) {
         return -1;
     }
 
-    firstkey       = (offset + 1) % maxid;
-    ridstart       = offset;
-    generate_relation(relation, firstkey, maxid, ridstart);
+    for (i = 0; i < relation->num_tuples; i++) {
+        relation->tuples[i].key     = i;
+        relation->tuples[i].payload = i;
+    }
 
 #ifdef SAVE_RELATIONS_TO_FILE
     char const *filename;
-    if (rCreated) {
-        filename = "S.tbl";
-    } else {
-        filename = "R.tbl";
-    }
+    filename = "R.tbl";
     write_relation(relation, filename);
 #endif
-
-    rCreated = true;
     return 0;
 }
 
+
 /*
-* Create relation using multiple threads.
-* @relation: relR/relS passed by reference to create new relations.
-* @num_tuples: r_size/s_size parameter
-* @ nthreads: number of threads
-* @maxid: number of threads.
+* Create relation S.
+* @relation: relS passed by reference to create new relations.
+* @num_tuples: r_size parameter
+* @task_size: the size of tasks that threads will be taking at a time.
+* @skew: the skew that will affect matches.
 */
-int create_relation_multithread(Relation *relation, uint64_t num_tuples, uint32_t nthreads, uint64_t maxid) {
+int create_relation_S(Relation *relation, uint64_t num_tuples, int taskSize, int skew) {
 
-    int rv;
     uint32_t i;
-    uint64_t offset = 0;
-    unsigned int pagesize;
-    unsigned int npages;
-    unsigned int npages_perthr;
-    uint64_t ntuples_perthr;
-    uint64_t ntuples_lastthr;
-
-    RelCreateArg args[nthreads];    // Custom data struct.
-    pthread_t tid[nthreads];        // Thread IDs.
-    cpu_set_t set;                  // Linux struct representing set of CPUs.
-    pthread_attr_t attr;            // Pthread struct representing thread characteristics.
-    //    pthread_barrier_t barrier;      //
-
+    int taskSizeCounter = taskSize;
+    int skewMode = 1;
     relation->num_tuples = num_tuples;
 
-    /* we need aligned allocation of items */
+    // We need aligned allocation of items.
     relation->tuples = (Tuple*) MALLOC(num_tuples * sizeof(Tuple));
     if (!relation->tuples) {
         perror("out of memory");
         return -1;
     }
 
-    pagesize        = getpagesize();    // Returns current page size.
-    // Calculate how many pages will be needed for relation.
-    npages          = (num_tuples * sizeof(Tuple)) / pagesize + 1;
-    // Number of pager per thread.
-    npages_perthr   = npages / nthreads;
-    // Number of tuples per thread.
-    ntuples_perthr  =  npages_perthr * (pagesize/sizeof(Tuple));
-    if(npages_perthr == 0) { ntuples_perthr = num_tuples / nthreads; }
-    ntuples_lastthr = num_tuples - ntuples_perthr * (nthreads-1);
+    int mixer = 0;
 
-    pthread_attr_init(&attr);
+    if (skew) {
+        for (i = 0; i < relation->num_tuples; i++) {
+            if (skewMode == 2) {
+                relation->tuples[i].key = i;                  // matches.
+            } else if (skewMode == 1) {
+                relation->tuples[i].key = num_tuples + i;    // not matches.
+            }
+            relation->tuples[i].payload = i;
 
-    volatile void * locks = (volatile void *)calloc(num_tuples, sizeof(char));
+            // Switch skewMode every taskSize tuples.
+            taskSizeCounter --;
 
-    for(i = 0; i < nthreads; i++) {
-
-        int cpu_idx = get_cpu_id(i);
-        CPU_ZERO(&set);
-        CPU_SET(cpu_idx, &set);
-        pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &set);
-
-        // rel holds the empty relation struct that was passed in from main.
-        // Only a portion of the relation is passed in to each thread.
-        // The portion is defined by rel.tuples beginning at the first tuple, and
-        // num_tuples indicating how many tuples that thread is responsible for.
-        args[i].firstkey       = (offset + 1) % maxid;
-        args[i].maxid          = maxid;
-        args[i].ridstart       = offset;
-        args[i].rel.tuples     = relation->tuples + offset;
-        args[i].rel.num_tuples = (i == nthreads-1) ? ntuples_lastthr : ntuples_perthr;
-        args[i].fullrel = relation;
-        args[i].locks   = locks;
-
-        offset += ntuples_perthr;
-
-        rv = pthread_create(&tid[i], &attr, random_unique_gen_thread, (void*)&args[i]);
-
-        if (rv){
-            fprintf(stderr, "[ERROR] pthread_create() return code is %d\n", rv);
-            exit(-1);
+            if (taskSizeCounter == 0) {
+                taskSizeCounter = 10;
+                mixer += 1;
+                if (skewMode == 1) {
+                    if (mixer < 5) {
+                        skewMode = 1;
+                    } else {
+                        mixer = 0;
+                        skewMode = 2;
+                    }
+                }
+                else if (skewMode == 2) {
+                    skewMode = 1;
+                }
+            }
+        }
+    } else {
+        for (i = 0; i < relation->num_tuples; i++) {
+            relation->tuples[i].key     = i;
+            relation->tuples[i].payload = i;
         }
     }
 
-    for (i = 0; i < nthreads; i++) {
-        pthread_join(tid[i], NULL);
-    }
-
-    /* clean up */
-    free((char*)locks);
-
-#ifdef PERSIST_RELATIONS
-    if (rCreated) { write_relation(relation, "S.tbl"); }
-    else { write_relation(relation, "R.tbl"); }
+#ifdef SAVE_RELATIONS_TO_FILE
+    char const *filename;
+    filename = "S.tbl";
+    write_relation(relation, filename);
 #endif
 
-    rCreated = true;
     return 0;
 }
+
 

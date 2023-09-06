@@ -17,9 +17,8 @@
 #include "lock.h"               /* lock, unlock */
 #include "join_params.h"         /* constant parameters */
 #include "cpu_mapping.h"        /* get_cpu_id */
-//#include "queue.h"
-//pthread_barrier_t barrier;
-typedef struct arg_t arg_t;
+
+//typedef struct arg_t arg_t;
 
 #ifndef NEXT_POW_2
 /**
@@ -43,20 +42,15 @@ typedef struct arg_t arg_t;
 #define HASH(X, MASK, SKIP) (((X) & MASK) >> SKIP)
 #endif
 
-struct arg_t {
-    int32_t tid;
-    Hashtable *ht;
-    Relation *relR;
-    Relation *relS;
-    pthread_barrier_t * barrier;
-//    int64_t             num_results;
-//    int                 num_threads;
-    ThreadResult *threadResults; /* results of the thread */
-
-#ifdef MEASURE_LATENCY
-    struct timeval start, buildPhaseEnd, probePhaseEnd, end;
-#endif
-};
+//struct arg_t {
+//    int32_t tid;
+//    Hashtable *ht;
+//    Relation *relR;
+//    Relation *relS;
+//    pthread_barrier_t * barrier;
+//    ThreadResult *threadResults; /* results of the thread */
+//    struct timeval start, buildPhaseEnd, probePhaseEnd, end;
+//};
 
 /**
  * Allocates a hashtable of NUM_BUCKETS and inits everything to 0.
@@ -135,8 +129,6 @@ void free_bucket_buffer(BucketBuffer * buf) {
 
 void build(ThreadArg &args) {
 
-    std::cout << "building" << std::endl;
-
     QueueTask task = *args.task;
     Relation rel = *args.relR;
     Hashtable ht = *args.ht;
@@ -144,14 +136,14 @@ void build(ThreadArg &args) {
     int startTup = task.startTupleIndex;
     int endTup = task.endTupleIndex;
 
-    std::cout << "start = " << startTup << " end = " << endTup << "\n" << std::endl;
-
+//    std::cout << "building" << std::endl;
+//    std::cout << "start = " << startTup << " end = " << endTup << "\n" << std::endl;
 
     const uint32_t hashmask = args.ht->hash_mask;
     const uint32_t skipbits = args.ht->skip_bits;
 
     // Loop through all tuples assigned to this thread.
-    for (int i = startTup; i < endTup; i++) {
+    for (int i = startTup; i <= endTup; i++) {
         Tuple * dest;         // dest tuple.
         Bucket * curr, * nxt; // cur, next buckets.
 
@@ -186,22 +178,25 @@ void build(ThreadArg &args) {
 
 void probe(ThreadArg &args) {
 
-//    std::cout << "probing" << std::endl;
-
     QueueTask task = *args.task;
     Relation rel = *args.relS;
     Hashtable ht = *args.ht;
     BucketBuffer *overflowBuf = args.overflowBuf;
     int startTup = task.startTupleIndex;
-    int endTup = startTup + args.taskSize;
+    int endTup = task.endTupleIndex;
+
+//    std::cout << "probing" << std::endl;
+//    std::cout << "start = " << startTup << " end = " << endTup << "\n" << std::endl;
 
     uint32_t i, j;
     int64_t matches = 0;
     const uint32_t hashmask = args.ht->hash_mask;
     const uint32_t skipbits = args.ht->skip_bits;
 
+    args.completedTasks += 1;
+
     // Loop through all tuples this thread was assigned.
-    for (int i = startTup; i < endTup; i++) {
+    for (int i = startTup; i <= endTup; i++) {
 
         // Calculate hash.
         intkey_t idx = HASH(rel.tuples[i].key, hashmask, skipbits);
@@ -212,6 +207,10 @@ void probe(ThreadArg &args) {
         do {
             for (j = 0; j < b->count; j++) {
                 if (rel.tuples[i].key == b->tuples[j].key) {
+
+                    // busy work for match.
+//                    for (int s = 0; s < 50000; s++) {}
+                    args.matches += 1;
                     matches ++;
                     ChainTuple * chainTup = cb_next_writepos(args.threadJoinResults->chainedTupBuf);
                     chainTup->key        = rel.tuples[i].key;    /* key */
@@ -221,6 +220,9 @@ void probe(ThreadArg &args) {
             }
             b = b->next;    // Follow overflow pointer.
         } while (b);        // AKA while there is a valid next pointer.
+    }
+    if (matches >= 1) {
+        args.matchTasks += 1;
     }
     args.threadJoinResults->numResults += matches;
     return;

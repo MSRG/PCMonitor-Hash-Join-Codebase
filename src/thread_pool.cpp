@@ -20,32 +20,12 @@
 #include "join_params.h"         /* constant parameters */
 #include "join.h"
 
+//#include "result_file_names.h"
+
 const char * TIMING_CSV = "timing-results.csv";
+const char * THREAD_RESULTS_CSV = "individual-thread-results.csv";
 
-// ******************* TESTING FUNCTION ***************************
-struct TestStruct {
-    int a;
-    int *b;
-};
-void ThreadPool::testFunction(int a, int &b) {
-
-    std::cout << a << " " << b << std::endl;
-    std::cout << &a << " " << &b << std::endl;
-
-    TestStruct testStruct;
-    testStruct.a = a;
-    testStruct.b = &b;
-
-    std::cout << "a = " << a << " b = " << b << " struct a = " << testStruct.a << " struct b = " << testStruct.b << std::endl;
-    std::cout << "struct b * = " << *testStruct.b << std::endl;
-
-    testStruct.a = 17;
-    *testStruct.b = 18;
-
-    std::cout << "a = " << a << " b = " << b << " struct a = " << testStruct.a << " struct b = " << testStruct.b << std::endl;
-    std::cout << "struct b * = " << *testStruct.b << std::endl;
-}
-// *****************************************************************
+pthread_mutex_t results_lock;
 
 ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, SafeQueue &buildQ_, SafeQueue &probeQ_, PcmMonitor &pcmMonitor_) {
 
@@ -65,7 +45,7 @@ ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashta
     joinResults = (JoinResults *) malloc(sizeof(JoinResults) * numThreads);
 }
 
-void ThreadPool::buildQueue() {
+void ThreadPool::populateQueues() {
 
     double buildTasks =  ceil((double) relR->num_tuples / taskSize);
     double probeTasks =  ceil((double) relS->num_tuples / taskSize);
@@ -86,7 +66,6 @@ void ThreadPool::buildQueue() {
         task.function = &build;
 
         buildQ->enqueue(task);
-//        std::cout << "start = " << start << " end = " << end << "\n" << std::endl;
         start += taskSize;
     }
 
@@ -107,12 +86,11 @@ void ThreadPool::buildQueue() {
         task.function = &probe;
 
         probeQ->enqueue(task);
-//        std::cout << "start = " << start << " end = " << end << "\n" << std::endl;
         start += taskSize;
     }
 }
 
-void ThreadPool::saveTimingResults(){
+void ThreadPool::saveTimingResults() {
     // Micro Seconds
     double totalDiffUsec = ((ts.endTime).tv_sec*1000000L + (ts.endTime).tv_usec) - ((ts.startTime).tv_sec*1000000L+(ts.startTime).tv_usec);
     double buildDiffUsec = (((ts.buildPhaseEnd).tv_sec*1000000L + (ts.buildPhaseEnd).tv_usec)
@@ -138,14 +116,34 @@ void ThreadPool::saveTimingResults(){
     }
 }
 
+void ThreadPool::freeThreadsIfBuildQueueEmpty() {
+    if (buildQ->isQueueEmpty()) {
+        for (int i = 0; i <= 14; i++) {
+            pcmMonitor->cv[i].notify_one();
+        }
+    }
+}
+
+void ThreadPool::freeThreadsIfProbeQueueEmpty() {
+    if (probeQ->isQueueEmpty()) {
+        for (int i = 0; i <= 14; i++) {
+            pcmMonitor->cv[i].notify_one();
+        }
+    }
+}
+
 bool ThreadPool::checkThreadStatusDuringBuild(ThreadArg &args) {
     if (!pcmMonitor->shouldThreadStop(args.tid)) {
         return true; // Thread is good to continue working.
     } else {
-        // While loop to wait for the thread to begin again.
-        while (pcmMonitor->shouldThreadStop(args.tid) && (!buildQ->isQueueEmpty())) {
-//            std::cout << "thread " << args.tid << " is stopped." << std::endl;
-        }
+        std::cout << "thread " << args.tid << " is haulting work on build." << std::endl;
+        // lock.
+        std::unique_lock<std::mutex> lk(pcmMonitor->mutx[args.tid]);
+        // wait.
+        pcmMonitor->cv[args.tid].wait(lk);
+        // has been notified.
+        std::cout << "thread " << args.tid << " is resuming work in build." << std::endl;
+
         return true;
     }
 }
@@ -154,12 +152,35 @@ bool ThreadPool::checkThreadStatusDuringProbe(ThreadArg &args) {
     if (!pcmMonitor->shouldThreadStop(args.tid)) {
         return true; // Thread is good to continue working.
     } else {
-        // While loop to wait for the thread to begin again.
-        while (pcmMonitor->shouldThreadStop(args.tid) && (!probeQ->isQueueEmpty())) {
-//            std::cout << "thread " << args.tid << " is stopped." << std::endl;
-        }
+        std::cout << "thread " << args.tid << " is haulting work on probe." << std::endl;
+        // lock.
+        std::unique_lock<std::mutex> lk(pcmMonitor->mutx[args.tid]);
+        // wait.
+        pcmMonitor->cv[args.tid].wait(lk);
+        // has been notified.
+        std::cout << "thread " << args.tid << " is resuming work in probe." << std::endl;
         return true;
     }
+}
+
+void saveIndividualThreadResults(ThreadArg &args) {
+    pthread_mutex_lock(&results_lock);
+
+    if (THREAD_RESULTS_CSV) {
+        std::fstream file(THREAD_RESULTS_CSV, std::ios::app);
+        file << sched_getcpu();
+        file << ",";
+        file << args.completedTasks;
+        file << ",";
+        file << args.matches;
+        file << ",";
+        file << args.matchTasks;
+        file << ",";
+        file << args.nonMatchTasks;
+        file << "\n";
+        file.close();
+    }
+    pthread_mutex_unlock(&results_lock);
 }
 
 void ThreadPool::run(ThreadArg * args) {
@@ -167,9 +188,7 @@ void ThreadPool::run(ThreadArg * args) {
 
     init_bucket_buffer(&args->overflowBuf);
     if (args->tid == 1) {
-        std::cout << "get time of day" << ts.startTime.tv_sec << std::endl;
         gettimeofday(&(ts.startTime), NULL);
-        std::cout << "get time of day" << ts.startTime.tv_sec << std::endl;
     }
 
     while (checkThreadStatusDuringBuild(*args)) {
@@ -178,26 +197,28 @@ void ThreadPool::run(ThreadArg * args) {
         } else { break; }
     }
 
-    pthread_barrier_wait(args->barrier);
-    if (args->tid == 1) {
-        std::cout << "get time of day" << ts.buildPhaseEnd.tv_sec << std::endl;
+//    freeThreadsIfBuildQueueEmpty();
+//    pthread_barrier_wait(args->barrier);
+    if (args->tid == 0) {
         gettimeofday(&(ts.buildPhaseEnd), NULL);
-        std::cout << "get time of day" << ts.buildPhaseEnd.tv_sec << std::endl;
     }
 
-    while (checkThreadStatusDuringProbe(*args)) {
-        if (probeQ->dequeue(*(args->task))) {
-            (args->task->function)(*args);
-        } else { break; }
+    if (!probeQ->isQueueEmpty()){
+        while (checkThreadStatusDuringProbe(*args)) {
+            if (probeQ->dequeue(*(args->task))) {
+                (args->task->function)(*args);
+            } else { break; }
+        }
     }
 
+    freeThreadsIfProbeQueueEmpty();
     pthread_barrier_wait(args->barrier);
-    if (args->tid == 1) {
-        std::cout << "get time of day" << ts.endTime.tv_sec << std::endl;
+    if (args->tid == 0) {
         gettimeofday(&(ts.endTime), NULL);
-        std::cout << "get time of day" << ts.endTime.tv_sec << std::endl;
     }
 
+    args->nonMatchTasks = (args->completedTasks - args->matchTasks);
+    saveIndividualThreadResults(*args);
     free_bucket_buffer(args->overflowBuf); // Clean-up the overflow buffers.
 }
 
@@ -230,6 +251,9 @@ void ThreadPool::start() {
 
         // Thread arg set-up.
         args[i].tid = i;
+        args[i].matches = 0;
+        args[i].completedTasks = 0;
+        args[i].matchTasks = 0;
         args[i].ht = ht;
         args[i].relR = relR;
         args[i].relS = relS;

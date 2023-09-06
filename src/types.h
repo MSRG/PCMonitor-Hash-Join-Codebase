@@ -135,17 +135,13 @@ struct ChainedTupleBuffer {
 
 /**************************** THREAD POOL STRUCTS ****************************/
 
-
-struct queueTask_ {
-    void *       function;
-    int          size;
-    int          startTupleIndex;
-    int          endTupleIndex;
-};
-
 struct ThreadArg {
     int tid;
     int taskSize;
+    int completedTasks;
+    int matches;
+    int nonMatchTasks;
+    int matchTasks;
     Hashtable *ht;
     Relation *relR;
     Relation *relS;
@@ -162,7 +158,6 @@ typedef void (*funcky)(ThreadArg&);
 struct QueueTask {
     int          startTupleIndex;
     int          endTupleIndex;
-
     funcky function;
 };
 

@@ -25,12 +25,14 @@ class ThreadPool {
         PcmMonitor *pcmMonitor;
 
         ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, SafeQueue &buildQ_, SafeQueue &probeQ_, PcmMonitor &pcmMonitor_);
-        void testFunction(int a, int &c);
+//        void testFunction(int a, int &c);
         void start();
         void saveTimingResults();
+        void freeThreadsIfBuildQueueEmpty();
+        void freeThreadsIfProbeQueueEmpty();
         bool checkThreadStatusDuringBuild(ThreadArg &args);
         bool checkThreadStatusDuringProbe(ThreadArg &args);
-        void buildQueue();
+        void populateQueues();
         void readQueue();
         void run(ThreadArg * param);
         void stop();

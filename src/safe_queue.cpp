@@ -46,7 +46,6 @@ bool SafeQueue::dequeue(QueueTask &task) {
         pthread_mutex_unlock(&queue_lock);
         return true;
     }
-
     pthread_mutex_unlock(&queue_lock);
     return false;
 }

@@ -15,7 +15,6 @@
 #include "thread_pool.h"
 #include "relation_generator.h"
 #include "safe_queue.h"
-//#include "pcm_monitor.h"
 
 using namespace std;
 
@@ -27,7 +26,7 @@ struct CmdParams {
     uint64_t sSize;
     uint64_t totalCores;
     uint64_t taskSize;
-    double skew;
+    int skew;
 };
 
 void print_help();
@@ -43,12 +42,17 @@ int main(int argc, char **argv) {
 
     /* Command line parameters */
     CmdParams cmdParams;
-    cmdParams.rSize      = 100000000;
-    cmdParams.sSize      = 100000000;
+    cmdParams.rSize      = 1000000;
+    cmdParams.sSize      = 1000000;
     cmdParams.skew       = 0;
     cmdParams.totalCores = 14;
     cmdParams.taskSize   = 10;
     parse_args(argc, argv, &cmdParams);
+
+    fprintf(stdout,
+            "[INFO] %lu cores being monitored. Task size = %lu.\n",
+            cmdParams.totalCores,
+            cmdParams.taskSize);
 
     // Create relation R.
     fprintf(stdout,
@@ -56,7 +60,7 @@ int main(int argc, char **argv) {
             (double) sizeof(Tuple) * cmdParams.rSize/1024.0/1024.0,
             (unsigned long)cmdParams.rSize);
 
-    create_relation(&relR, cmdParams.rSize, cmdParams.rSize);
+    create_relation_R(&relR, cmdParams.rSize);
 
     // Create relation S.
     fprintf(stdout,
@@ -64,35 +68,34 @@ int main(int argc, char **argv) {
             (double) sizeof(Tuple) * cmdParams.sSize/1024.0/1024.0,
             (unsigned long)cmdParams.sSize);
 
-    create_relation(&relS, cmdParams.sSize, cmdParams.sSize);
+    create_relation_S(&relS, cmdParams.sSize, cmdParams.taskSize, cmdParams.skew);
 
     printf("[INFO] Initializing PCM Monitor...\n");
     PcmMonitor pcmMonitor(cmdParams.totalCores);
     pcmMonitor.setUpMonitoring();
-    pcmMonitor.startMonitorThread();
 
     printf("[INFO] Initializing Hashtable...\n");
     Hashtable * ht;
     uint32_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
     allocate_hashtable(&ht, numBuckets);
 
+    printf("[INFO] Starting Monitoring...\n");
+    pcmMonitor.startMonitorThread();
+
     printf("[INFO] Initializing ThreadPool...\n");
+
+    // RUN THE BUSY-CORES PROGRAM!
+//    system("cd /home/sofia/Projects/CloudDB/busy-cores && ./run.sh &");
     ThreadPool threadPool(cmdParams.totalCores, relR, relS, *ht, cmdParams.taskSize, buildQ, probeQ, pcmMonitor);
-    threadPool.buildQueue();
+    threadPool.populateQueues();
     threadPool.start();
 
-    //    int a = 10;
-    //    int b = 15;
-    //    threadPool.testFunction(a, b);
-
-    printf("[INFO] Stopping ThreadPool...\n");
     pcmMonitor.setMonitoringToFalse();
     pcmMonitor.stopMonitoring();
 
-#ifdef SAVE_RELATIONS_TO_FILE
+#if SAVE_RELATIONS_TO_FILE==1
     threadPool.saveJoinedRelationToFile();
 #endif
-
     return 0;
 }
 
@@ -116,18 +119,20 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
             {
                 {"r-size",  required_argument, 0, 'r'},
                 {"s-size",  required_argument, 0, 's'},
-                {"skew",    required_argument, 0, 'z'},
+                {"total-cores", required_argument, 0, 'c'},
+                {"task-size", required_argument, 0, 't'},
+                {"skew", required_argument, 0, 'k'},
             };
 
         /* getopt_long stores the option index here. */
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "r:s:k",
-                        long_options, &option_index);
+        c = getopt_long(argc, argv, "r:s:c:t", long_options, &option_index);
 
         /* Detect the end of the options. */
-        if (c == -1)
+        if (c == -1) {
             break;
+        }
         switch (c)
         {
             case 0:
@@ -142,9 +147,14 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
             case 'r':
                 cmdParams->rSize = atol(optarg);
                 break;
-
             case 's':
                 cmdParams->sSize = atol(optarg);
+                break;
+            case 'c':
+                cmdParams->totalCores = atof(optarg);
+                break;
+            case 't':
+                cmdParams->taskSize = atof(optarg);
                 break;
             case 'k':
                 cmdParams->skew = atof(optarg);
@@ -153,6 +163,7 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
                 break;
         }
     }
+
     /* Print any remaining command line arguments (not options). */
     if (optind < argc) {
         printf ("non-option arguments: ");
