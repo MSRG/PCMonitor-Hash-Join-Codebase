@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
     printf("[INFO] Initializing ThreadPool...\n");
 
     // RUN THE BUSY-CORES PROGRAM!
-//    system("cd /home/sofia/Projects/CloudDB/busy-cores && ./run.sh &");
+    system("cd /home/sofia/Projects/CloudDB/busy-cores && ./run.sh &");
     ThreadPool threadPool(cmdParams.totalCores, relR, relS, *ht, cmdParams.taskSize, buildQ, probeQ, pcmMonitor);
     threadPool.populateQueues();
     threadPool.start();
