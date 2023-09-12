@@ -22,6 +22,7 @@ class PcmMonitor {
         void startMonitorThread();
         void saveCacheValues();
         void saveIpcValues();
+        void saveMemoryBandwidthValues();
         void joinMonitorThread();
         void setMonitoringToFalse();
         void stopMonitoring();
@@ -31,14 +32,14 @@ class PcmMonitor {
     private:
         std::pair<double,double> ipcStats[14];
         std::pair<int,int> l2CacheStats[14];
+        std::pair<double,double> rmbStats[14];
+        std::pair<double,double> lmbStats[14];
         int threadStrikes[14];
         int test;
         bool threadStop[14];
         bool monitoring;
         int totalCores;
         std::vector<std::thread> pcmThreads;
-
-
 };
 
 #endif

@@ -8,6 +8,10 @@ current_time = current_time.strftime("%m-%d-%Y-%H:%M:%S")
 folder_path = '../plots/'+current_time
 cache_png_file_name = folder_path+'/L2-Cache-Misses.png'
 ipc_png_file_name = folder_path+'/IPC.png'
+mb_png_file_name = folder_path+'/RM.png'
+lmb_png_file_name = folder_path+'/local-RM.png'
+rmb_png_file_name = folder_path+'/remote-RM.png'
+
 tresults_png_file_name = folder_path+'/Individual-Thread-Results.png'
 
 def setFileNames():
@@ -98,14 +102,102 @@ def plotThreadResults():
         for val in x:
             x_3.append(val+0.5)
 
-#         plt.bar(x_3, matches, color = 'r', width = 0.25, label = "Number of Matches")
-
         plt.xlabel('Core ID')
         plt.ylabel('Completed Tasks')
         plt.title('Completed Tasks per Core')
         plt.legend(loc=(1.04, 0))
         plt.grid()
         plt.savefig(tresults_png_file_name, bbox_inches='tight')
+
+
+def plotMemBandwidth():
+    plt.clf()
+    y = []
+    all_rows = []
+
+    with open('../build/MB-results.csv') as csvFile:
+        rows = csv.reader(csvFile, delimiter=',')
+
+        for row in rows:
+            all_rows.append(row)
+
+        for i in range (14):
+            core = i
+            for j in range (2):
+                y = getColumnDob(all_rows, i)
+                x = list(range(0, len(y)))
+                if j == 1:
+                    label = "local-core-"+str(core)
+                else:
+                    label = "remote-core-"+str(core)
+                plt.plot(x, y, linestyle = 'dashed', marker = 'o', label = label)
+
+#             y = getColumnDob(all_rows, i)
+#             x = list(range(0, len(y)))
+#             label = "core-"+str(i)
+#             plt.plot(x, y, linestyle = 'dashed', marker = 'o', label = label)
+
+        plt.xticks(rotation = 25)
+        plt.xlabel('Checkpoint')
+        plt.ylabel('IPC')
+        plt.title('IPC per Core')
+        plt.grid()
+        plt.legend(loc=(1.04, 0))
+        plt.savefig(mb_png_file_name, bbox_inches='tight')
+
+def plotLocalMemBandwidth():
+    plt.clf()
+    y = []
+    all_rows = []
+
+    with open('../build/MB-results.csv') as csvFile:
+        rows = csv.reader(csvFile, delimiter=',')
+        for row in rows:
+            all_rows.append(row)
+
+        core = 0
+        for i in range (0,28,2):
+
+            y = getColumnDob(all_rows, i)
+            x = list(range(0, len(y)))
+            label = "local-core-"+str(core)
+            plt.plot(x, y, linestyle = 'dashed', marker = 'o', label = label)
+            core += 1
+
+        plt.xticks(rotation = 25)
+        plt.xlabel('Checkpoint')
+        plt.ylabel('Unit')
+        plt.title('Local Memory Bandwidth')
+        plt.grid()
+        plt.legend(loc=(1.04, 0))
+        plt.savefig(lmb_png_file_name, bbox_inches='tight')
+
+def plotRemoteMemBandwidth():
+    plt.clf()
+    y = []
+    all_rows = []
+
+    with open('../build/MB-results.csv') as csvFile:
+        rows = csv.reader(csvFile, delimiter=',')
+        for row in rows:
+            all_rows.append(row)
+
+        core = 0
+
+        for i in range (1,28,2):
+            y = getColumnDob(all_rows, i)
+            x = list(range(0, len(y)))
+            label = "remote-core-"+str(core)
+            plt.plot(x, y, linestyle = 'dashed', marker = 'o', label = label)
+            core += 1
+
+        plt.xticks(rotation = 25)
+        plt.xlabel('Checkpoint')
+        plt.ylabel('Unit')
+        plt.title('Remote Memory Bandwidth')
+        plt.grid()
+        plt.legend(loc=(1.04, 0))
+        plt.savefig(rmb_png_file_name, bbox_inches='tight')
 
 
 if __name__ == "__main__":
@@ -116,9 +208,11 @@ if __name__ == "__main__":
     else:
         print(f"Folder '{folder_path}' already exists.")
 
-    setFileNames()
+#     setFileNames()
     plotCache()
     plotIpc()
     plotThreadResults()
+    plotLocalMemBandwidth()
+    plotRemoteMemBandwidth()
 
     print("Done plotting!\n")

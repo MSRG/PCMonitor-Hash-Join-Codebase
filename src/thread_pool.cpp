@@ -17,7 +17,7 @@
 
 #include "thread_pool.h"
 #include "cpu_mapping.h"        /* get_cpu_id */
-#include "join_params.h"         /* constant parameters */
+#include "join_params.h"        /* constant parameters */
 #include "join.h"
 
 //#include "result_file_names.h"

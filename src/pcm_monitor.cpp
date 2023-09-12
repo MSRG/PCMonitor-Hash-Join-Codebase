@@ -7,6 +7,7 @@
 
 const char * CACHE_CSV = "cache-results.csv";
 const char * IPC_CSV = "IPC-results.csv";
+const char * MB_CSV = "MB-results.csv";
 const char * THREAD_RESULTS_CSV_COPY = "individual-thread-results.csv"; // Defined in thread-pool.cpp
 
 using namespace pcm;
@@ -31,6 +32,8 @@ PcmMonitor::PcmMonitor(int totalCores_) {
         l2CacheStats[i].second = 0;
         ipcStats[i].first = 0;
         ipcStats[i].second = 0;
+        lmbStats[i].first = 0;
+        lmbStats[i].second = 0;
     }
 }
 
@@ -94,7 +97,7 @@ void PcmMonitor::analyzeCacheStats() {
     int worstValue = 0;
     int worstCore = 0;
     int maxStrikes = 5;
-    double ipcThreshold = 2;
+    double ipcThreshold = 1.5;
 
     for (int i = 0; i < totalCores; i++) {
 
@@ -102,7 +105,7 @@ void PcmMonitor::analyzeCacheStats() {
             threadStrikes[i] += 1;
         } else if (ipcStats[i].second <= ipcThreshold) {
             threadStrikes[i] -= 1;
-        }
+
 
         // CASE A: Difference between previous and current value exceed max allowable diff.
         // Add a strike to each core with a high diff.
@@ -128,6 +131,7 @@ void PcmMonitor::analyzeCacheStats() {
 //            worstValue = l2CacheStats[i].second;
 //            worstCore = i;
 //        }
+        }
     }
 }
 
@@ -148,6 +152,7 @@ void PcmMonitor::runMonitoring() {
     }
 }
 
+
 /*
  * Thread/core 15.
 */
@@ -157,6 +162,7 @@ void PcmMonitor::runAnalyzing() {
 //        makeStopDecisions();
     }
 }
+
 
 /*
  * Clear the cvs file(s) used to save performance counter data.
@@ -174,6 +180,10 @@ void PcmMonitor::clearCsvFiles() {
 
     // Individual Thread Results file.
     file.open(THREAD_RESULTS_CSV_COPY, std::ofstream::out | std::ofstream::trunc);
+    file.close();
+
+    // Memory Bandwidth Results file.
+    file.open(MB_CSV, std::ofstream::out | std::ofstream::trunc);
     file.close();
 }
 
@@ -214,6 +224,30 @@ void PcmMonitor::saveIpcValues() {
     }
 }
 
+void PcmMonitor::saveMemoryBandwidthValues() {
+    if (IPC_CSV) {
+        std::fstream file(MB_CSV, std::ios::app);
+
+        for (int i = 0; i < totalCores; i++) {
+            if (!i == 0) { file << ","; }
+            double localMemBdwth = getLocalMemoryBW(coreBeforeState[i], coreAfterState[i]);
+            file << localMemBdwth;
+            file << ",";
+            double remoteMemBdwth = getRemoteMemoryBW(coreBeforeState[i], coreAfterState[i]);
+            file << remoteMemBdwth;
+
+            lmbStats[i].first = lmbStats[i].second;
+            lmbStats[i].second = localMemBdwth;
+
+            rmbStats[i].first = rmbStats[i].second;
+            rmbStats[i].second = remoteMemBdwth;
+        }
+        file << "\n";
+        file.close();
+
+    }
+}
+
 /*
  * Update the before and after counter states.
  *
@@ -229,6 +263,7 @@ void PcmMonitor::checkpointPerformanceCounters() {
 
     saveCacheValues();
     saveIpcValues();
+    saveMemoryBandwidthValues();
     core = 0;
 
     for (int i = 0; i < totalCores; i++) {
