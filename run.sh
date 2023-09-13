@@ -28,7 +28,7 @@
 for i in {1..10}
 do
   cd build
-  sudo ./Pool-HashJoin-PCM --r-size=2000000000 --s-size=2000000000 --total-cores=14 --task-size=10000000 --skew=0
+  sudo ./Pool-HashJoin-PCM --r-size=2000000000 --s-size=2000000000 --total-cores=14 --task-size=100000 --skew=0
 
   cd ..
   ./plot.sh

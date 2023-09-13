@@ -16,8 +16,6 @@ FineGrainedQueue::FineGrainedQueue(double numOfTasks_) {
 */
 void FineGrainedQueue::enqueue(QueueTask task) {
 //    pthread_mutex_lock(&enqueue_lock);
-    std::cout << "enqueue!" << std::endl;
-
     enqueue_mtx.lock();
 
     FineGrainedLock taskLock;                           // new lock for this task.
