@@ -3,7 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <sched.h>              /* CPU_ZERO, CPU_SET */
-#include <pthread.h>            /* pthread_* */
+#include <pthread.h>            /* pthread_ */
 #include <string.h>             /* memset */
 #include <stdio.h>              /* printf */
 #include <stdlib.h>             /* memalign */
@@ -24,7 +24,8 @@ SafeQueue::SafeQueue() {
 
 /**
  * Add task to queue.
-*/void SafeQueue::enqueue(QueueTask task) {
+*/
+void SafeQueue::safeEnqueue(QueueTask task) {
     pthread_mutex_lock(&queue_lock);
     q.push(task);       // push method pushes a copy of task.
     pthread_mutex_unlock(&queue_lock);
@@ -33,7 +34,7 @@ SafeQueue::SafeQueue() {
 /**
  * Pop off the least recently inserted task object in the queue.
 */
-bool SafeQueue::dequeue(QueueTask &task) {
+bool SafeQueue::safeDequeue(QueueTask &task) {
 
     pthread_mutex_lock(&queue_lock);
 

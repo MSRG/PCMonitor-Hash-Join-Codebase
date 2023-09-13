@@ -42,16 +42,6 @@
 #define HASH(X, MASK, SKIP) (((X) & MASK) >> SKIP)
 #endif
 
-//struct arg_t {
-//    int32_t tid;
-//    Hashtable *ht;
-//    Relation *relR;
-//    Relation *relS;
-//    pthread_barrier_t * barrier;
-//    ThreadResult *threadResults; /* results of the thread */
-//    struct timeval start, buildPhaseEnd, probePhaseEnd, end;
-//};
-
 /**
  * Allocates a hashtable of NUM_BUCKETS and inits everything to 0.
  * @param ht pointer to a Hashtable pointer

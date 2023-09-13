@@ -11,8 +11,8 @@ class SafeQueue {
 
     public:
         SafeQueue();
-        void enqueue(QueueTask task);
-        bool dequeue(QueueTask &task);
+        void safeEnqueue(QueueTask task);
+        bool safeDequeue(QueueTask &task);
         bool isQueueEmpty();
 
     private:

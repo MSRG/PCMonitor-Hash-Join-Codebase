@@ -20,14 +20,13 @@
 #include "join_params.h"        /* constant parameters */
 #include "join.h"
 
-//#include "result_file_names.h"
 
 const char * TIMING_CSV = "timing-results.csv";
 const char * THREAD_RESULTS_CSV = "individual-thread-results.csv";
 
 pthread_mutex_t results_lock;
 
-ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, SafeQueue &buildQ_, SafeQueue &probeQ_, PcmMonitor &pcmMonitor_) {
+ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_) {
 
     // Assign constructor arguments to class members.
     numThreads = numThreads_;
@@ -88,6 +87,7 @@ void ThreadPool::populateQueues() {
         probeQ->enqueue(task);
         start += taskSize;
     }
+
 }
 
 void ThreadPool::saveTimingResults() {
@@ -192,24 +192,28 @@ void ThreadPool::run(ThreadArg * args) {
     }
 
     while (checkThreadStatusDuringBuild(*args)) {
-        if (buildQ->dequeue(*(args->task))) {
+        if (buildQ->dequeue(*(args->task), args->lastTaskVectorPosition)) {
             (args->task->function)(*args);
         } else { break; }
     }
 
 //    freeThreadsIfBuildQueueEmpty();
 //    pthread_barrier_wait(args->barrier);
+
     if (args->tid == 0) {
         gettimeofday(&(ts.buildPhaseEnd), NULL);
     }
 
-    if (!probeQ->isQueueEmpty()){
+    // Reset the task vector pointer for the probe phase.
+    args->lastTaskVectorPosition = -1;
+
+//    if (!probeQ->isQueueEmpty()){
         while (checkThreadStatusDuringProbe(*args)) {
-            if (probeQ->dequeue(*(args->task))) {
+            if (probeQ->dequeue(*(args->task), args->lastTaskVectorPosition)) {
                 (args->task->function)(*args);
             } else { break; }
         }
-    }
+//    }
 
     freeThreadsIfProbeQueueEmpty();
     pthread_barrier_wait(args->barrier);
@@ -254,6 +258,7 @@ void ThreadPool::start() {
         args[i].matches = 0;
         args[i].completedTasks = 0;
         args[i].matchTasks = 0;
+        args[i].lastTaskVectorPosition = -1;
         args[i].ht = ht;
         args[i].relR = relR;
         args[i].relS = relS;

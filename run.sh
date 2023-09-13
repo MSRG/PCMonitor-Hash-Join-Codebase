@@ -22,7 +22,7 @@
 #./plot.sh
 
 #cd build
-#sudo ./Pool-HashJoin-PCM --r-size=2000000000 --s-size=2000000000 --total-cores=14 --task-size=10000000 --skew=0
+#sudo ./Pool-HashJoin-PCM --r-size=100 --s-size=100 --total-cores=14 --task-size=10 --skew=0
 
 
 for i in {1..10}

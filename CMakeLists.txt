@@ -17,6 +17,8 @@ add_subdirectory(src)
 set(SOURCES
         src/safe_queue.h
         src/safe_queue.cpp
+        src/fine_grained_queue.h
+        src/fine_grained_queue.cpp
         src/tuple_buffer.h
         src/lock.h
         src/thread_pool.h

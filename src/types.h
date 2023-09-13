@@ -14,24 +14,27 @@
 #include "config.h"
 
 // Tuple keys & values are 64-bits (8 bytes) each —> 16 bytes per tuple.
-typedef int64_t intkey_t;
-typedef int64_t value_t;
+typedef         int64_t             intkey_t;
+typedef         int64_t             value_t;
 
-typedef struct Bucket        Bucket;
-typedef struct Hashtable     Hashtable;
-typedef struct BucketBuffer BucketBuffer;
+typedef struct Bucket               Bucket;
+typedef struct Hashtable            Hashtable;
+typedef struct BucketBuffer         BucketBuffer;
 
-typedef struct Tuple    Tuple;
-typedef struct Relation Relation;
+typedef struct Tuple                Tuple;
+typedef struct Relation             Relation;
 
-typedef struct Result Result;
-typedef struct ThreadResult ThreadResult;
+typedef struct Result               Result;
+typedef struct ThreadResult         ThreadResult;
 
-typedef struct ThreadArg ThreadArg;
-typedef struct QueueTask QueueTask;
+typedef struct ThreadArg            ThreadArg;
+typedef struct QueueTask            QueueTask;
 
-typedef struct ChainedTupleBuffer ChainedTupleBuffer;
-typedef struct TupleBuffer TupleBuffer;
+typedef struct ChainedTupleBuffer   ChainedTupleBuffer;
+typedef struct TupleBuffer          TupleBuffer;
+
+typedef struct FineGrainedLock      FineGrainedLock;
+
 
 using namespace std::chrono;
 
@@ -142,6 +145,7 @@ struct ThreadArg {
     int matches;
     int nonMatchTasks;
     int matchTasks;
+    int lastTaskVectorPosition;
     Hashtable *ht;
     Relation *relR;
     Relation *relS;
@@ -167,6 +171,17 @@ struct QueueTask {
 
 struct Timestamps {
     struct timeval startTime, buildPhaseEnd, endTime;
+};
+
+
+/**************************** TASK QUEUE STRUCTS ****************************/
+
+struct FineGrainedLock {
+    double padding1;
+    double padding2;
+    double padding3;
+    pthread_mutex_t fineLock;
+//    std::mutex fineLock;
 };
 
 

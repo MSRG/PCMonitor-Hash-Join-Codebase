@@ -7,6 +7,7 @@
 #include <dlfcn.h>
 #include <iostream>
 #include <getopt.h>
+#include <cmath>
 
 // Files:
 #include "types.h"
@@ -14,8 +15,8 @@
 #include "join.h"
 #include "thread_pool.h"
 #include "relation_generator.h"
-#include "safe_queue.h"
-
+//#include "safe_queue.h"
+#include "fine_grained_queue.h"
 using namespace std;
 
 /**
@@ -35,10 +36,9 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams);
 
 int main(int argc, char **argv) {
 
+    double numOfBuildTasks, numOfProbeTasks;
     Relation relR;
     Relation relS;
-    SafeQueue buildQ;
-    SafeQueue probeQ;
 
     /* Command line parameters */
     CmdParams cmdParams;
@@ -49,10 +49,20 @@ int main(int argc, char **argv) {
     cmdParams.taskSize   = 10;
     parse_args(argc, argv, &cmdParams);
 
+    numOfBuildTasks = ceil(double(cmdParams.rSize) / double(cmdParams.taskSize));
+    numOfProbeTasks = ceil(double(cmdParams.sSize) / double(cmdParams.taskSize));
+
+    std::cout << numOfBuildTasks << std::endl;
+
+    FineGrainedQueue buildQ(numOfBuildTasks);
+    FineGrainedQueue probeQ(numOfProbeTasks);
+
+
     fprintf(stdout,
             "[INFO] %lu cores being monitored. Task size = %lu.\n",
             cmdParams.totalCores,
-            cmdParams.taskSize);
+            cmdParams.taskSize
+            );
 
     // Create relation R.
     fprintf(stdout,
@@ -85,7 +95,7 @@ int main(int argc, char **argv) {
     printf("[INFO] Initializing ThreadPool...\n");
 
     // RUN THE BUSY-CORES PROGRAM!
-    system("cd /home/sofia/Projects/CloudDB/busy-cores && ./run.sh &");
+//    system("cd /home/sofia/Projects/CloudDB/busy-cores && ./run.sh &");
     ThreadPool threadPool(cmdParams.totalCores, relR, relS, *ht, cmdParams.taskSize, buildQ, probeQ, pcmMonitor);
     threadPool.populateQueues();
     threadPool.start();

@@ -9,7 +9,8 @@
 
 #include "types.h"
 #include "pcm_monitor.h"
-#include "safe_queue.h"
+//#include "safe_queue.h"
+#include "fine_grained_queue.h"
 
 class ThreadPool {
 
@@ -17,14 +18,14 @@ class ThreadPool {
         Relation *relR, *relS;
         Hashtable *ht;
         JoinResults *joinResults;
-        SafeQueue *buildQ;
-        SafeQueue *probeQ;
+        FineGrainedQueue *buildQ;
+        FineGrainedQueue *probeQ;
         Timestamps ts;
         struct timeval startTime;
         int numThreads, taskSize, currentTupIndex, phase;
         PcmMonitor *pcmMonitor;
 
-        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, SafeQueue &buildQ_, SafeQueue &probeQ_, PcmMonitor &pcmMonitor_);
+        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_);
 //        void testFunction(int a, int &c);
         void start();
         void saveTimingResults();
