@@ -70,7 +70,6 @@ struct Relation {
 
 /**************************** HASHTABLE STRUCTS ****************************/
 
-
 /**
  * Normal hashtable buckets.
  * if KEY_8B then key is 8B and sizeof(bucket_t) = 48B
@@ -79,24 +78,24 @@ struct Relation {
 struct Bucket {
     volatile char     latch;
     /* 3B hole */
-    uint32_t          count;
-    Tuple           tuples[BUCKET_SIZE];
-    struct Bucket * next;
+    uint64_t          count;
+    Tuple             tuples[BUCKET_SIZE];
+    struct Bucket     * next;
 };
 
 /** Hashtable structure. */
 struct Hashtable {
-    Bucket * buckets;
-    int32_t    num_buckets;
-    uint32_t   hash_mask;
-    uint32_t   skip_bits;
+    Bucket *    buckets;
+    uint64_t    num_buckets;
+    uint64_t    hash_mask;
+    uint64_t    skip_bits;
 };
 
 /** Pre-allocated bucket buffers are used for overflow-buckets. */
 struct BucketBuffer {
-    struct  BucketBuffer * next;
-    uint32_t count;
-    Bucket buf[OVERFLOW_BUF_SIZE];
+    struct      BucketBuffer * next;
+    uint64_t    count;
+    Bucket      buf[OVERFLOW_BUF_SIZE];
 };
 
 
@@ -112,7 +111,7 @@ struct ThreadResult {
 
 /** Type definition for join results. */
 struct JoinResults {
-    int              numResults;
+    uint64_t              numResults;
     ChainedTupleBuffer * chainedTupBuf;
 };
 
@@ -138,13 +137,26 @@ struct ChainedTupleBuffer {
 
 /**************************** THREAD POOL STRUCTS ****************************/
 
+struct RelCreationThreadArg {
+    uint64_t relSize;
+    int skew;
+    int taskSize;
+    Relation *relation;
+};
+
+struct RelFillThreadArg {
+    uint64_t start;
+    uint64_t end;
+    Relation *relation;
+};
+
 struct ThreadArg {
     int tid;
-    int taskSize;
-    int completedTasks;
-    int matches;
-    int nonMatchTasks;
-    int matchTasks;
+    uint64_t taskSize;
+    uint64_t completedTasks;
+    uint64_t matches;
+    uint64_t nonMatchTasks;
+    uint64_t matchTasks;
     int lastTaskVectorPosition;
     Hashtable *ht;
     Relation *relR;
@@ -160,8 +172,8 @@ struct ThreadArg {
 typedef void (*funcky)(ThreadArg&);
 
 struct QueueTask {
-    int          startTupleIndex;
-    int          endTupleIndex;
+    uint64_t          startTupleIndex;
+    uint64_t          endTupleIndex;
     funcky function;
 };
 

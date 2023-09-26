@@ -3,21 +3,30 @@ import csv
 import os
 from datetime import datetime
 
-current_time = datetime.now()
-current_time = current_time.strftime("%m-%d-%Y-%H:%M:%S")
-folder_path = '../plots/'+current_time
-cache_png_file_name = folder_path+'/L2-Cache-Misses.png'
-ipc_png_file_name = folder_path+'/IPC.png'
-mb_png_file_name = folder_path+'/RM.png'
-lmb_png_file_name = folder_path+'/local-RM.png'
-rmb_png_file_name = folder_path+'/remote-RM.png'
+# current_time = datetime.now()
+# current_time = current_time.strftime("%m-%d-%Y-%H:%M:%S")
+# folder_path = '../plots/'+current_time
+# cache_png_file_name = folder_path+'/L2-Cache-Misses.png'
+# ipc_png_file_name = folder_path+'/IPC.png'
+# mb_png_file_name = folder_path+'/RM.png'
+# lmb_png_file_name = folder_path+'/local-RM.png'
+# rmb_png_file_name = folder_path+'/remote-RM.png'
+# tresults_png_file_name = folder_path+'/Individual-Thread-Results.png'
 
-tresults_png_file_name = folder_path+'/Individual-Thread-Results.png'
+numThreads = 15
 
-def setFileNames():
-    cache_png_file_name = '../plots/L2-Cache-Misses.png'
-    ipc_png_file_name = '../plots/IPC.png'
-    tresults_png_file_name = '../plots/Individual-Thread-Results.png'
+cache_csv_file_name = '/cache-results.csv'
+ipc_csv_file_name = '/IPC-results.csv'
+mb_csv_file_name = '/MB-results.csv'
+tresults_csv_file_name = '/individual-thread-results.csv'
+
+cache_png_file_name = '/cache-results.png'
+ipc_png_file_name = '/IPC-results.png'
+mb_png_file_name = '/MB-results.png'
+lmb_png_file_name = '/MB-local-results.png'
+rmb_png_file_name = '/MB-remote-results.png'
+tresults_png_file_name = '/individual-thread-results.png'
+
 
 def getColumnInt(matrix, i):
     return [int(row[i]) for row in matrix]
@@ -25,17 +34,18 @@ def getColumnInt(matrix, i):
 def getColumnDob(matrix, i):
     return [float(row[i]) for row in matrix]
 
-def plotCache():
+def plotCache(path):
     y = []
     all_rows = []
 
-    with open('../build/cache-results.csv') as csvFile:
+    print(path + cache_csv_file_name)
+    with open(path + cache_csv_file_name) as csvFile:
         rows = csv.reader(csvFile, delimiter=',')
 
         for row in rows:
             all_rows.append(row)
 
-        for i in range (14):
+        for i in range (numThreads):
             y = getColumnInt(all_rows, i)
             x = list(range(0, len(y)))
             label = "core-"+str(i)
@@ -47,21 +57,21 @@ def plotCache():
         plt.title('L2 Cache Misses per Core', fontsize = 20)
         plt.grid()
         plt.legend(loc=(1.04, 0))
-        plt.savefig(cache_png_file_name, bbox_inches='tight')
+        plt.savefig(path + "/plots" + cache_png_file_name, bbox_inches='tight')
 
 
-def plotIpc():
+def plotIpc(path):
     plt.clf()
     y = []
     all_rows = []
 
-    with open('../build/IPC-results.csv') as csvFile:
+    with open(path + ipc_csv_file_name) as csvFile:
         rows = csv.reader(csvFile, delimiter=',')
 
         for row in rows:
             all_rows.append(row)
 
-        for i in range (14):
+        for i in range (numThreads):
             y = getColumnDob(all_rows, i)
             x = list(range(0, len(y)))
             label = "core-"+str(i)
@@ -73,16 +83,16 @@ def plotIpc():
         plt.title('IPC per Core')
         plt.grid()
         plt.legend(loc=(1.04, 0))
-        plt.savefig(ipc_png_file_name, bbox_inches='tight')
+        plt.savefig(path + "/plots" + ipc_png_file_name, bbox_inches='tight')
 
 
-def plotThreadResults():
+def plotThreadResults(path):
     plt.clf()
     data = []
     x_2 = []
     x_3 = []
 
-    with open('../build/individual-thread-results.csv') as csvFile:
+    with open(path + tresults_csv_file_name) as csvFile:
         rows = csv.reader(csvFile, delimiter=',')
 
         for row in rows:
@@ -107,21 +117,21 @@ def plotThreadResults():
         plt.title('Completed Tasks per Core')
         plt.legend(loc=(1.04, 0))
         plt.grid()
-        plt.savefig(tresults_png_file_name, bbox_inches='tight')
+        plt.savefig(path + "/plots" + tresults_png_file_name, bbox_inches='tight')
 
 
-def plotMemBandwidth():
+def plotMemBandwidth(path):
     plt.clf()
     y = []
     all_rows = []
 
-    with open('../build/MB-results.csv') as csvFile:
+    with open(path + mb_csv_file_name) as csvFile:
         rows = csv.reader(csvFile, delimiter=',')
 
         for row in rows:
             all_rows.append(row)
 
-        for i in range (14):
+        for i in range (plots):
             core = i
             for j in range (2):
                 y = getColumnDob(all_rows, i)
@@ -132,25 +142,20 @@ def plotMemBandwidth():
                     label = "remote-core-"+str(core)
                 plt.plot(x, y, linestyle = 'dashed', marker = 'o', label = label)
 
-#             y = getColumnDob(all_rows, i)
-#             x = list(range(0, len(y)))
-#             label = "core-"+str(i)
-#             plt.plot(x, y, linestyle = 'dashed', marker = 'o', label = label)
-
         plt.xticks(rotation = 25)
         plt.xlabel('Checkpoint')
         plt.ylabel('IPC')
         plt.title('IPC per Core')
         plt.grid()
         plt.legend(loc=(1.04, 0))
-        plt.savefig(mb_png_file_name, bbox_inches='tight')
+        plt.savefig(path + "/plots" + mb_png_file_name, bbox_inches='tight')
 
-def plotLocalMemBandwidth():
+def plotLocalMemBandwidth(path):
     plt.clf()
     y = []
     all_rows = []
 
-    with open('../build/MB-results.csv') as csvFile:
+    with open(path + mb_csv_file_name) as csvFile:
         rows = csv.reader(csvFile, delimiter=',')
         for row in rows:
             all_rows.append(row)
@@ -170,14 +175,14 @@ def plotLocalMemBandwidth():
         plt.title('Local Memory Bandwidth')
         plt.grid()
         plt.legend(loc=(1.04, 0))
-        plt.savefig(lmb_png_file_name, bbox_inches='tight')
+        plt.savefig(path + "/plots" + lmb_png_file_name, bbox_inches='tight')
 
-def plotRemoteMemBandwidth():
+def plotRemoteMemBandwidth(path):
     plt.clf()
     y = []
     all_rows = []
 
-    with open('../build/MB-results.csv') as csvFile:
+    with open(path + mb_csv_file_name) as csvFile:
         rows = csv.reader(csvFile, delimiter=',')
         for row in rows:
             all_rows.append(row)
@@ -197,22 +202,37 @@ def plotRemoteMemBandwidth():
         plt.title('Remote Memory Bandwidth')
         plt.grid()
         plt.legend(loc=(1.04, 0))
-        plt.savefig(rmb_png_file_name, bbox_inches='tight')
+        plt.savefig(path + "/plots" + rmb_png_file_name, bbox_inches='tight')
 
 
 if __name__ == "__main__":
 
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-        print(f"Created folder '{folder_path}'.")
-    else:
-        print(f"Folder '{folder_path}' already exists.")
+    results_path = "../results"
+    dirNames = next(os.walk(results_path))[1]
+    for directory in dirNames:
 
-#     setFileNames()
-    plotCache()
-    plotIpc()
-    plotThreadResults()
-    plotLocalMemBandwidth()
-    plotRemoteMemBandwidth()
+        directory = "../results/" + directory
+#         print("Directory = ", directory)
+        plot_dir = directory + "/plots"
+#         print("plot dir =  " + plot_dir)
+
+        if not os.path.exists(plot_dir):
+            os.makedirs(plot_dir)
+            print(f"Created folder '{plot_dir}'.")
+            plotCache(directory)
+            plotIpc(directory)
+            plotThreadResults(directory)
+            plotLocalMemBandwidth(directory)
+            plotRemoteMemBandwidth(directory)
+        else:
+            print(f"Folder '{plot_dir}' already exists.")
+
+
+
+#     plotCache()
+#     plotIpc()
+#     plotThreadResults()
+#     plotLocalMemBandwidth()
+#     plotRemoteMemBandwidth()
 
     print("Done plotting!\n")

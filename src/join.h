@@ -8,7 +8,7 @@
 #include "types.h"
 #include "tuple_buffer.h"
 
-void allocate_hashtable(Hashtable ** ppht, uint32_t nbuckets);
+void allocate_hashtable(Hashtable ** ppht, uint64_t nbuckets);
 
 void init_bucket_buffer(BucketBuffer ** ppbuf);
 

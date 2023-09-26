@@ -9,10 +9,12 @@
 class PcmMonitor {
 
     public:
-        PcmMonitor(int totalCores_);
+        PcmMonitor(int totalCores_, bool corePausing_, char* path_);
+        ~PcmMonitor(void);
         void setUpMonitoring();
         void allowAllThreadsToContinue();
         void makeStopDecisions();
+        void createResultsFolder();
         void clearCsvFiles();
         bool shouldThreadStop(int id);
         void runMonitoring();
@@ -26,19 +28,20 @@ class PcmMonitor {
         void joinMonitorThread();
         void setMonitoringToFalse();
         void stopMonitoring();
-        std::condition_variable cv[14];
-        std::mutex mutx[14];
+        std::condition_variable cv[15];
+        std::mutex mutx[15];
 
     private:
-        std::pair<double,double> ipcStats[14];
-        std::pair<int,int> l2CacheStats[14];
-        std::pair<double,double> rmbStats[14];
-        std::pair<double,double> lmbStats[14];
-        int threadStrikes[14];
-        int test;
-        bool threadStop[14];
+        char *path;
+        std::pair<double,double> ipcStats[15];
+        std::pair<int,int> l2CacheStats[15];
+        std::pair<double,double> rmbStats[15];
+        std::pair<double,double> lmbStats[15];
+        int threadStrikes[15];
+        bool threadStop[15];
         bool monitoring;
         int totalCores;
+        bool corePausing;
         std::vector<std::thread> pcmThreads;
 };
 

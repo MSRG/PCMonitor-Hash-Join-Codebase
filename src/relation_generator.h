@@ -7,8 +7,7 @@
 
 #include "types.h"
 
-int create_relation_R(Relation *relation, uint64_t num_tuples);
-
-int create_relation_S(Relation *relation, uint64_t num_tuples, int taskSize, int skew);
+void *create_relation_R(void * args);
+void *create_relation_S(void * args);
 
 #endif //POOL_HASHJOIN_PCM_RELATION_GENERATOR_H

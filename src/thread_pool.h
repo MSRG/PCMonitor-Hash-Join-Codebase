@@ -22,11 +22,10 @@ class ThreadPool {
         FineGrainedQueue *probeQ;
         Timestamps ts;
         struct timeval startTime;
-        int numThreads, taskSize, currentTupIndex, phase;
+        int numThreads, taskSize;
+//        int currentTupIndex, phase;
         PcmMonitor *pcmMonitor;
-
-        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_);
-//        void testFunction(int a, int &c);
+        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_);
         void start();
         void saveTimingResults();
         void freeThreadsIfBuildQueueEmpty();
@@ -38,8 +37,10 @@ class ThreadPool {
         void run(ThreadArg * param);
         void stop();
         void saveJoinedRelationToFile();
+        void saveIndividualThreadResults(ThreadArg &args);
 
     private:
+        char *path;
         std::vector<std::thread> threads;
         std::mutex queue_mutex;                  // Prevents data races to the job queue
         std::mutex timer_mutex;                  // Prevents data races to the job queue

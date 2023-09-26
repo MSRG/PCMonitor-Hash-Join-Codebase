@@ -1,11 +1,20 @@
 #include <iostream>
 #include <fstream>
+#include <iostream>
+#include <ctime>
+#include <string>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "pcm_monitor.h"
-#include "cpu_mapping.h"        /* get_cpu_id */
-#include "config.h"         /* ENABLE_CORE_PAUSING */
+//#include "cpu_mapping.h"        /* get_cpu_id */
+#include "config.h"             /* ENABLE_CORE_PAUSING */
 
-const char * CACHE_CSV = "cache-results.csv";
+const char * CACHE_PATH = "cache-results.csv";
 const char * IPC_CSV = "IPC-results.csv";
 const char * MB_CSV = "MB-results.csv";
 const char * THREAD_RESULTS_CSV_COPY = "individual-thread-results.csv"; // Defined in thread-pool.cpp
@@ -14,16 +23,19 @@ using namespace pcm;
 
 static PCM * pcmInstance;
 static PCM::CustomCoreEventDescription MyEvents[4];
-static CoreCounterState coreBeforeState[14];
-static CoreCounterState coreAfterState[14];
+static CoreCounterState coreBeforeState[15];
+static CoreCounterState coreAfterState[15];
 
-//pthread_mutex_t monitor_lock;
+PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_) {
+//    std::cout << "Initializing PCM Monitor." << std::endl;
+//    std::cout << "TOTAL CORES = " << totalCores << std::endl;
 
-PcmMonitor::PcmMonitor(int totalCores_) {
-    std::cout << "Initializing PCM Monitor." << std::endl;
-    totalCores = totalCores_;
     monitoring = false;
-    test = 7;
+    totalCores = totalCores_;
+    corePausing = corePausing_;
+
+    this->path = new char[strlen(path_)+1];
+    strcpy(this->path, path_);
 
     for (int i = 0; i <= totalCores; i++) {
         threadStop[i] = false;
@@ -37,6 +49,11 @@ PcmMonitor::PcmMonitor(int totalCores_) {
     }
 }
 
+PcmMonitor::~PcmMonitor(void) {
+//  std::cout << "PcmMonitor is being deleted" << std::endl;
+   free(this->path);
+}
+
 void PcmMonitor::setUpMonitoring() {
 
     uint32 core = 0;
@@ -45,8 +62,8 @@ void PcmMonitor::setUpMonitoring() {
     pcmInstance = m;
 
     if (pcmInstance->good()) {
-        std::cout << "pcmInstance is good." << std::endl;
         status = pcmInstance->program(PCM::DEFAULT_EVENTS, MyEvents);
+        std::cout << "pcmInstance is good." << std::endl;
 
     } else {
         status = pcmInstance->program();
@@ -58,7 +75,8 @@ void PcmMonitor::setUpMonitoring() {
         core++;
     }
     monitoring = true;
-    clearCsvFiles();
+//    createResultsFolder();
+//    clearCsvFiles();
 }
 
 void PcmMonitor::allowAllThreadsToContinue() {
@@ -74,7 +92,7 @@ bool PcmMonitor::shouldThreadStop(int id) {
 void PcmMonitor::makeStopDecisions() {
     int maxStrikesTolerance = 20;
 
-    // NOTE: code 0 is not allowed to stop.
+    // NOTE: core 0 is not allowed to stop.
     for (int i = 1; i < totalCores; i++) {
         if (threadStrikes[i] > maxStrikesTolerance) {
             threadStop[i] = true;
@@ -137,17 +155,13 @@ void PcmMonitor::analyzeCacheStats() {
 
 
 /*
- * Thread/core 14.
+ * Thread/core 15.
 */
 void PcmMonitor::runMonitoring() {
-
     while (monitoring) {
         checkpointPerformanceCounters();
         analyzeCacheStats();
-#if ENABLE_CORE_PAUSING==1
-        makeStopDecisions();
-#endif
-//        sleep(0.8);
+        if (corePausing) { makeStopDecisions(); }
         std::this_thread::sleep_for(std::chrono::milliseconds(400));
     }
 }
@@ -164,14 +178,46 @@ void PcmMonitor::runAnalyzing() {
 }
 
 
+void PcmMonitor::createResultsFolder() {
+    char * path;
+
+    // get datetime and convert to string.
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%d-%m-%Y--%H:%M:%S");
+    auto datetimeStr = oss.str();
+    const char * datetime = datetimeStr.c_str();
+
+    // put path together.
+    strcpy(path, "../results/");
+    strcat(path, datetime);
+
+    // make new directory named after datetime in results folder.
+    int check = mkdir(path, 0777);
+    // check if directory is created or not
+    if (check) {
+        printf("Unable to create directory\n");
+        exit(1);
+    }
+
+    // save the new path as class member.
+    const char * tmp = "/";
+    strcat(path, tmp);
+    this->path = new char[strlen(path)+1];
+    strcpy(this->path, path);
+}
+
+
 /*
  * Clear the cvs file(s) used to save performance counter data.
  */
 void PcmMonitor::clearCsvFiles() {
+
     std::ofstream file;
 
     // Cache file.
-    file.open(CACHE_CSV, std::ofstream::out | std::ofstream::trunc);
+    file.open(CACHE_PATH, std::ofstream::out | std::ofstream::trunc);
     file.close();
 
     // IPC file.
@@ -192,60 +238,54 @@ void PcmMonitor::clearCsvFiles() {
  */
 void PcmMonitor::saveCacheValues() {
 
-    if (CACHE_CSV) {
-        std::fstream file(CACHE_CSV, std::ios::app);
+    std::ofstream file(this->path + std::string(CACHE_PATH), std::ios_base::app);
 
-        for (int i = 0; i < totalCores; i++) {
-            if (!i == 0) { file << ","; }
-            int misses = getL2CacheMisses(coreBeforeState[i], coreAfterState[i]);
-            file << misses;
-            l2CacheStats[i].first = l2CacheStats[i].second;
-            l2CacheStats[i].second = misses;
-        }
-        file << "\n";
-        file.close();
+    for (int i = 0; i < totalCores; i++) {
+        if (!i == 0) { file << ","; }
+        int misses = getL2CacheMisses(coreBeforeState[i], coreAfterState[i]);
+        file << misses;
+        l2CacheStats[i].first = l2CacheStats[i].second;
+        l2CacheStats[i].second = misses;
     }
+    file << "\n";
+    file.close();
 }
 
 void PcmMonitor::saveIpcValues() {
-    if (IPC_CSV) {
-        std::fstream file(IPC_CSV, std::ios::app);
 
-        for (int i = 0; i < totalCores; i++) {
-            if (!i == 0) { file << ","; }
-            double ipc = getIPC(coreBeforeState[i], coreAfterState[i]);
-            file << ipc;
-            ipcStats[i].first = ipcStats[i].second;
-            ipcStats[i].second = ipc;
-        }
-        file << "\n";
-        file.close();
+    std::ofstream file(this->path + std::string(IPC_CSV), std::ios_base::app);
 
+    for (int i = 0; i < totalCores; i++) {
+        if (!i == 0) { file << ","; }
+        double ipc = getIPC(coreBeforeState[i], coreAfterState[i]);
+        file << ipc;
+        ipcStats[i].first = ipcStats[i].second;
+        ipcStats[i].second = ipc;
     }
+    file << "\n";
+    file.close();
 }
 
 void PcmMonitor::saveMemoryBandwidthValues() {
-    if (IPC_CSV) {
-        std::fstream file(MB_CSV, std::ios::app);
 
-        for (int i = 0; i < totalCores; i++) {
-            if (!i == 0) { file << ","; }
-            double localMemBdwth = getLocalMemoryBW(coreBeforeState[i], coreAfterState[i]);
-            file << localMemBdwth;
-            file << ",";
-            double remoteMemBdwth = getRemoteMemoryBW(coreBeforeState[i], coreAfterState[i]);
-            file << remoteMemBdwth;
+    std::ofstream file(this->path + std::string(MB_CSV), std::ios_base::app);
 
-            lmbStats[i].first = lmbStats[i].second;
-            lmbStats[i].second = localMemBdwth;
+    for (int i = 0; i < totalCores; i++) {
+        if (!i == 0) { file << ","; }
+        double localMemBdwth = getLocalMemoryBW(coreBeforeState[i], coreAfterState[i]);
+        file << localMemBdwth;
+        file << ",";
+        double remoteMemBdwth = getRemoteMemoryBW(coreBeforeState[i], coreAfterState[i]);
+        file << remoteMemBdwth;
 
-            rmbStats[i].first = rmbStats[i].second;
-            rmbStats[i].second = remoteMemBdwth;
-        }
-        file << "\n";
-        file.close();
+        lmbStats[i].first = lmbStats[i].second;
+        lmbStats[i].second = localMemBdwth;
 
+        rmbStats[i].first = rmbStats[i].second;
+        rmbStats[i].second = remoteMemBdwth;
     }
+    file << "\n";
+    file.close();
 }
 
 /*
@@ -280,8 +320,9 @@ void PcmMonitor::startMonitorThread() {
     pthread_attr_t attr;
     pthread_attr_init(&attr);
 
-    // THREAD #1 (ID = 14), COLLECT STATISTICS.
-    cpu_idx = get_cpu_id(14);
+    // THREAD #1 (ID = 54), COLLECT STATISTICS.
+    cpu_idx = 15;
+//    cpu_idx = get_cpu_id(15);
     CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
     CPU_SET(cpu_idx, &set);         // Add CPU cpu to set.
 
@@ -292,20 +333,19 @@ void PcmMonitor::startMonitorThread() {
     }
 
     // THREAD #2 (ID = 15), ANALYZE STATISTICS.
-    cpu_idx = get_cpu_id(15);
-    CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
-    CPU_SET(cpu_idx, &set);         // Add CPU cpu to set.
-
-    pcmThreads.emplace_back(&PcmMonitor::runAnalyzing, this);
-    rv = pthread_setaffinity_np(pcmThreads.back().native_handle(), sizeof(cpu_set_t), &set);
-    if (rv != 0) {
-      std::cerr << "Error calling pthread_setaffinity_np: " << rv << "\n";
-    }
+//    cpu_idx = get_cpu_id(15);
+//    CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
+//    CPU_SET(cpu_idx, &set);         // Add CPU cpu to set.
+//
+//    pcmThreads.emplace_back(&PcmMonitor::runAnalyzing, this);
+//    rv = pthread_setaffinity_np(pcmThreads.back().native_handle(), sizeof(cpu_set_t), &set);
+//    if (rv != 0) {
+//      std::cerr << "Error calling pthread_setaffinity_np: " << rv << "\n";
+//    }
 }
 
 void PcmMonitor::joinMonitorThread() {
 //    allowAllThreadsToContinue();
-
     for (std::thread & t : pcmThreads) {
         t.join();
     }

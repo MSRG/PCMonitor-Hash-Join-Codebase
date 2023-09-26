@@ -6,8 +6,7 @@
 #define POOL_HASHJOIN_PCM_CONFIG_H
 
 /** Analysis **/
-#define SAVE_RELATIONS_TO_FILE 1
-#define ENABLE_CORE_PAUSING 0
+#define SAVE_RELATIONS_TO_FILE 0
 
 /** Algorithm Parameters **/
 #define BUCKET_SIZE 2

@@ -46,18 +46,20 @@
  * Allocates a hashtable of NUM_BUCKETS and inits everything to 0.
  * @param ht pointer to a Hashtable pointer
  */
-void allocate_hashtable(Hashtable ** ppht, uint32_t nbuckets) {
+void allocate_hashtable(Hashtable ** ppht, uint64_t nbuckets) {
 
     Hashtable * ht;
     ht              = (Hashtable*)malloc(sizeof(Hashtable));
     ht->num_buckets = nbuckets;
     NEXT_POW_2((ht->num_buckets));
 
+    std::cout << "Hash table info:\n-- Num of buckets = " << nbuckets << "\n-- Size = " << (ht->num_buckets * sizeof(Bucket))/1000000000 << " GB.\n" << std::endl; ;
+
     // Allocate hashtable buckets cache line aligned.
     // Allocate (ht->num_buckets * sizeof(Bucket)) bytes and place the address of the allocated memory
     // in (void**)&ht->buckets. The address of the allocated memory will be a multiple of CACHE_LINE_SIZE.
     if (posix_memalign((void**)&ht->buckets, CACHE_LINE_SIZE, ht->num_buckets * sizeof(Bucket))) {
-        perror("Aligned allocation failed!\n");
+        perror("[Hashtable Building]: Aligned allocation failed!\n");
         exit(EXIT_FAILURE);
     }
 
@@ -119,25 +121,27 @@ void free_bucket_buffer(BucketBuffer * buf) {
 
 void build(ThreadArg &args) {
 
+    uint64_t i;
     QueueTask task = *args.task;
-    Relation rel = *args.relR;
     Hashtable ht = *args.ht;
     BucketBuffer *overflowBuf = args.overflowBuf;
-    int startTup = task.startTupleIndex;
-    int endTup = task.endTupleIndex;
+    uint64_t startTup = task.startTupleIndex;
+    uint64_t endTup = task.endTupleIndex;
 
 //    std::cout << "building" << std::endl;
 //    std::cout << "start = " << startTup << " end = " << endTup << "\n" << std::endl;
 
-    const uint32_t hashmask = args.ht->hash_mask;
-    const uint32_t skipbits = args.ht->skip_bits;
+    const uint64_t hashmask = args.ht->hash_mask;
+    const uint64_t skipbits = args.ht->skip_bits;
 
     // Loop through all tuples assigned to this thread.
-    for (int i = startTup; i <= endTup; i++) {
+    for (i = startTup; i <= endTup; i++) {
+
         Tuple * dest;         // dest tuple.
         Bucket * curr, * nxt; // cur, next buckets.
 
-        int32_t idx = HASH(rel.tuples[i].key, hashmask, skipbits);
+        intkey_t idx = HASH(args.relR->tuples[i].key, hashmask, skipbits);
+
         // Copy the tuple to appropriate hash bucket.
         // If full, follow nxt pointer to find correct place.
         curr = ht.buckets+idx;
@@ -160,7 +164,7 @@ void build(ThreadArg &args) {
             dest = curr->tuples + curr->count;
             curr->count ++;
         }
-        *dest = rel.tuples[i]; // Store the tuple in bucket.
+        *dest = args.relR->tuples[i]; // Store the tuple in bucket.
         unlock(&curr->latch);
     }
     return;
@@ -169,49 +173,47 @@ void build(ThreadArg &args) {
 void probe(ThreadArg &args) {
 
     QueueTask task = *args.task;
-    Relation rel = *args.relS;
     Hashtable ht = *args.ht;
     BucketBuffer *overflowBuf = args.overflowBuf;
-    int startTup = task.startTupleIndex;
-    int endTup = task.endTupleIndex;
+    uint64_t startTup = task.startTupleIndex;
+    uint64_t endTup = task.endTupleIndex;
 
 //    std::cout << "probing" << std::endl;
 //    std::cout << "start = " << startTup << " end = " << endTup << "\n" << std::endl;
 
-    uint32_t i, j;
+    uint64_t i, j;
     int64_t matches = 0;
-    const uint32_t hashmask = args.ht->hash_mask;
-    const uint32_t skipbits = args.ht->skip_bits;
+    int64_t matchesExist = 1;      // did this to be able to compare with matches.
+    int64_t matchesPerKey = 0;
+    const uint64_t hashmask = args.ht->hash_mask;
+    const uint64_t skipbits = args.ht->skip_bits;
 
     args.completedTasks += 1;
 
     // Loop through all tuples this thread was assigned.
-    for (int i = startTup; i <= endTup; i++) {
-
+    for (i = startTup; i <= endTup; i++) {
+        matchesPerKey = 0;
         // Calculate hash.
-        intkey_t idx = HASH(rel.tuples[i].key, hashmask, skipbits);
-
+        intkey_t idx = HASH(args.relS->tuples[i].key, hashmask, skipbits);
         // Use hash as offset to find relevant bucket.
         Bucket * b = ht.buckets+idx;
 
         do {
             for (j = 0; j < b->count; j++) {
-                if (rel.tuples[i].key == b->tuples[j].key) {
-
-                    // busy work for match.
-//                    for (int s = 0; s < 50000; s++) {}
+                if (args.relS->tuples[i].key == b->tuples[j].key) {
                     args.matches += 1;
                     matches ++;
+                    matchesPerKey ++;
                     ChainTuple * chainTup = cb_next_writepos(args.threadJoinResults->chainedTupBuf);
-                    chainTup->key        = rel.tuples[i].key;    /* key */
-                    chainTup->sPayload  = rel.tuples[i].payload; /* S-rid */
+                    chainTup->key        = args.relS->tuples[i].key;    /* key */
+                    chainTup->sPayload  = args.relS->tuples[i].payload; /* S-rid */
                     chainTup->rPayload  = b->tuples[j].payload;  /* R-rid */
                 }
             }
             b = b->next;    // Follow overflow pointer.
         } while (b);        // AKA while there is a valid next pointer.
     }
-    if (matches >= 1) {
+    if (matches >= matchesExist) {
         args.matchTasks += 1;
     }
     args.threadJoinResults->numResults += matches;

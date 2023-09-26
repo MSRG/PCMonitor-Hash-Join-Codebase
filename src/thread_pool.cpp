@@ -11,7 +11,6 @@
 #include <sys/time.h>           /* gettimeofday */
 #include <chrono>
 #include <functional>
-#include <sys/time.h>           /* gettimeofday */
 #include <vector>
 #include <math.h>               /* ceil */
 
@@ -20,13 +19,12 @@
 #include "join_params.h"        /* constant parameters */
 #include "join.h"
 
-
 const char * TIMING_CSV = "timing-results.csv";
 const char * THREAD_RESULTS_CSV = "individual-thread-results.csv";
 
 pthread_mutex_t results_lock;
 
-ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_) {
+ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_) {
 
     // Assign constructor arguments to class members.
     numThreads = numThreads_;
@@ -38,21 +36,23 @@ ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashta
     probeQ = &probeQ_;
     pcmMonitor = &pcmMonitor_;
 
+    // Path for saving results.
+    this->path = new char[strlen(path_)+1];
+    strcpy(this->path, path_);
+
     // Initializations.
-    phase = 1;
-    currentTupIndex = 1;
     joinResults = (JoinResults *) malloc(sizeof(JoinResults) * numThreads);
 }
 
 void ThreadPool::populateQueues() {
 
-    double buildTasks =  ceil((double) relR->num_tuples / taskSize);
-    double probeTasks =  ceil((double) relS->num_tuples / taskSize);
-    int start = 0;
-    int end = 0;
+    double numOfBuildTasks =  ceil((double) relR->num_tuples / taskSize);
+    double numOfProbeTasks =  ceil((double) relS->num_tuples / taskSize);
+    uint64_t start = 0;
+    uint64_t end = 0;
 
     // Build the BUILD PHASE Queue.
-    for (int i = 0; i < buildTasks; i++) {
+    for (int i = 0; i < numOfBuildTasks; i++) {
         if ((start + taskSize) <= relR->num_tuples) {
             end = start + (taskSize - 1);
         } else {
@@ -72,11 +72,11 @@ void ThreadPool::populateQueues() {
     end = 0;
 
     // Build the PROBE PHASE Queue.
-    for (int i = 0; i < probeTasks; i++) {
+    for (int i = 0; i < numOfProbeTasks; i++) {
         if ((start + taskSize) <= relS->num_tuples) {
             end = start + (taskSize - 1);
         } else {
-            end = relR->num_tuples - 1;
+            end = relS->num_tuples - 1;
         }
 
         QueueTask task;
@@ -89,6 +89,10 @@ void ThreadPool::populateQueues() {
     }
 
 }
+
+/********************************************************************************
+                                    SAVE RESULTS
+********************************************************************************/
 
 void ThreadPool::saveTimingResults() {
     // Micro Seconds
@@ -104,21 +108,39 @@ void ThreadPool::saveTimingResults() {
     // Minutes
     double totalDiffMin = totalDiffSec/60;
 
-    if (TIMING_CSV) {
-        std::fstream file(TIMING_CSV, std::ios::app);
-        file << "total-seconds,build-seconds,probe-seconds\n";
-        file << totalDiffSec;
-        file << ",";
-        file << buildDiffSec;
-        file << ",";
-        file << probeDiffSec;
-        file << "\n";
-    }
+    std::ofstream file(this->path + std::string(TIMING_CSV), std::ios_base::app);
+    file << "total-seconds,build-seconds,probe-seconds\n";
+    file << totalDiffSec;
+    file << ",";
+    file << buildDiffSec;
+    file << ",";
+    file << probeDiffSec;
+    file << "\n";
 }
+
+void ThreadPool::saveIndividualThreadResults(ThreadArg &args) {
+    pthread_mutex_lock(&results_lock);
+
+    std::ofstream file(this->path + std::string(THREAD_RESULTS_CSV), std::ios_base::app);
+    file << sched_getcpu();
+    file << ",";
+    file << args.completedTasks;
+    file << ",";
+    file << args.matches;
+    file << ",";
+    file << args.matchTasks;
+    file << ",";
+    file << args.nonMatchTasks;
+    file << "\n";
+    file.close();
+
+    pthread_mutex_unlock(&results_lock);
+}
+
 
 void ThreadPool::freeThreadsIfBuildQueueEmpty() {
     if (buildQ->isQueueEmpty()) {
-        for (int i = 0; i <= 14; i++) {
+        for (int i = 0; i <= numThreads; i++) {
             pcmMonitor->cv[i].notify_one();
         }
     }
@@ -126,7 +148,7 @@ void ThreadPool::freeThreadsIfBuildQueueEmpty() {
 
 void ThreadPool::freeThreadsIfProbeQueueEmpty() {
     if (probeQ->isQueueEmpty()) {
-        for (int i = 0; i <= 14; i++) {
+        for (int i = 0; i <= numThreads; i++) {
             pcmMonitor->cv[i].notify_one();
         }
     }
@@ -163,31 +185,17 @@ bool ThreadPool::checkThreadStatusDuringProbe(ThreadArg &args) {
     }
 }
 
-void saveIndividualThreadResults(ThreadArg &args) {
-    pthread_mutex_lock(&results_lock);
-
-    if (THREAD_RESULTS_CSV) {
-        std::fstream file(THREAD_RESULTS_CSV, std::ios::app);
-        file << sched_getcpu();
-        file << ",";
-        file << args.completedTasks;
-        file << ",";
-        file << args.matches;
-        file << ",";
-        file << args.matchTasks;
-        file << ",";
-        file << args.nonMatchTasks;
-        file << "\n";
-        file.close();
-    }
-    pthread_mutex_unlock(&results_lock);
-}
 
 void ThreadPool::run(ThreadArg * args) {
-//  std::cout << "Thread #" << args->tid << ": on CPU " << sched_getcpu() << "\n";
+
+//    pthread_mutex_lock(&results_lock);
+//    std::cout << "Running Thread #" << args->tid << ": on CPU " << sched_getcpu() << "\n";
+//    pthread_mutex_unlock(&results_lock);
 
     init_bucket_buffer(&args->overflowBuf);
-    if (args->tid == 1) {
+
+    if (args->tid == 0) {
+        std::cout << "saving startTime" << std::endl;
         gettimeofday(&(ts.startTime), NULL);
     }
 
@@ -198,9 +206,10 @@ void ThreadPool::run(ThreadArg * args) {
     }
 
 //    freeThreadsIfBuildQueueEmpty();
-//    pthread_barrier_wait(args->barrier);
+    pthread_barrier_wait(args->barrier);
 
     if (args->tid == 0) {
+        std::cout << "saving buildPhaseEnd" << std::endl;
         gettimeofday(&(ts.buildPhaseEnd), NULL);
     }
 
@@ -215,9 +224,13 @@ void ThreadPool::run(ThreadArg * args) {
         }
 //    }
 
+    // the first thread to reach here means that it tried to get something from the queue and couldn't.
+    // so there are no tasks left to get. so its fine to free the other threads.
     freeThreadsIfProbeQueueEmpty();
     pthread_barrier_wait(args->barrier);
+
     if (args->tid == 0) {
+        std::cout << "saving endTime" << std::endl;
         gettimeofday(&(ts.endTime), NULL);
     }
 
@@ -228,11 +241,11 @@ void ThreadPool::run(ThreadArg * args) {
 
 
 void ThreadPool::start() {
-
     int i;
-    cpu_set_t set;             // Linux struct representing set of CPUs.
+    cpu_set_t set;            // Linux struct representing set of CPUs.
     pthread_attr_t attr;
     pthread_attr_init(&attr);
+
     pthread_barrier_t barrier;
     pthread_t tid[numThreads];
 
@@ -272,6 +285,7 @@ void ThreadPool::start() {
         args[i].threadJoinResults->numResults = 0;
 
         threads.emplace_back(&ThreadPool::run, this, &args[i]);
+
         int rv = pthread_setaffinity_np(threads.back().native_handle(), sizeof(cpu_set_t), &set);
         if (rv != 0) {
           std::cerr << "Error calling pthread_setaffinity_np: " << rv << "\n";

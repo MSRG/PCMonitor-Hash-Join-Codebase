@@ -15,8 +15,8 @@ target_link_libraries(
         pcm_monitor
         join
         relation_generator
-        cpu_mapping
         thread_pool
+        cpu_mapping
         pthread
         numa
         pcm

@@ -18,7 +18,7 @@ class FineGrainedQueue {
         bool isQueueEmpty();
 
     private:
-        int numOfTasks;
+        double numOfTasks;
 //        std::vector<QueueTask> queueVector;
         std::vector<std::pair<std::pair<bool,FineGrainedLock>, QueueTask>> queueVector;
 
