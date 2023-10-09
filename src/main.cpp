@@ -185,6 +185,7 @@ int main(int argc, char **argv) {
     free(relR.tuples);
     free(relS.tuples);
     free(path);
+    deallocate_hashtable(*ht);
 //    std::cout << "DONE! BYE!" << std::endl;
     return 0;
 }

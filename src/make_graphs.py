@@ -13,7 +13,7 @@ from datetime import datetime
 # rmb_png_file_name = folder_path+'/remote-RM.png'
 # tresults_png_file_name = folder_path+'/Individual-Thread-Results.png'
 
-numThreads = 15
+# numThreads = 15
 
 cache_csv_file_name = '/cache-results.csv'
 ipc_csv_file_name = '/IPC-results.csv'
@@ -27,6 +27,7 @@ lmb_png_file_name = '/MB-local-results.png'
 rmb_png_file_name = '/MB-remote-results.png'
 tresults_png_file_name = '/individual-thread-results.png'
 
+nThreads = 0
 
 def getColumnInt(matrix, i):
     return [int(row[i]) for row in matrix]
@@ -35,6 +36,7 @@ def getColumnDob(matrix, i):
     return [float(row[i]) for row in matrix]
 
 def plotCache(path):
+    plt.clf()
     y = []
     all_rows = []
 
@@ -42,10 +44,15 @@ def plotCache(path):
     with open(path + cache_csv_file_name) as csvFile:
         rows = csv.reader(csvFile, delimiter=',')
 
+        # Find number of threads in the file:
+        nThreads = len(next(rows)) # Read first line and count columns
+#         print(nThreads)
+        csvFile.seek(0)
+
         for row in rows:
             all_rows.append(row)
 
-        for i in range (numThreads):
+        for i in range (nThreads):
             y = getColumnInt(all_rows, i)
             x = list(range(0, len(y)))
             label = "core-"+str(i)
@@ -68,10 +75,15 @@ def plotIpc(path):
     with open(path + ipc_csv_file_name) as csvFile:
         rows = csv.reader(csvFile, delimiter=',')
 
+#         Find number of threads in the file:
+        nThreads = len(next(rows)) # Read first line and count columns
+#         print(nThreads)
+        csvFile.seek(0)
+
         for row in rows:
             all_rows.append(row)
 
-        for i in range (numThreads):
+        for i in range (nThreads):
             y = getColumnDob(all_rows, i)
             x = list(range(0, len(y)))
             label = "core-"+str(i)
@@ -161,7 +173,7 @@ def plotLocalMemBandwidth(path):
             all_rows.append(row)
 
         core = 0
-        for i in range (0,28,2):
+        for i in range (0,nThreads,2):
 
             y = getColumnDob(all_rows, i)
             x = list(range(0, len(y)))
@@ -189,7 +201,7 @@ def plotRemoteMemBandwidth(path):
 
         core = 0
 
-        for i in range (1,28,2):
+        for i in range (1,nThreads,2):
             y = getColumnDob(all_rows, i)
             x = list(range(0, len(y)))
             label = "remote-core-"+str(core)
@@ -219,11 +231,11 @@ if __name__ == "__main__":
         if not os.path.exists(plot_dir):
             os.makedirs(plot_dir)
             print(f"Created folder '{plot_dir}'.")
-            plotCache(directory)
+            plotCache(directory)            # also finds the number of rows.
             plotIpc(directory)
             plotThreadResults(directory)
-            plotLocalMemBandwidth(directory)
-            plotRemoteMemBandwidth(directory)
+#             plotLocalMemBandwidth(directory)
+#             plotRemoteMemBandwidth(directory)
         else:
             print(f"Folder '{plot_dir}' already exists.")
 

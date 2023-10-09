@@ -72,6 +72,11 @@ void allocate_hashtable(Hashtable ** ppht, uint64_t nbuckets) {
     *ppht = ht;
 }
 
+void deallocate_hashtable(Hashtable & ht) {
+    free(ht.buckets);
+//    free(ht);
+}
+
 /**
  * Initializes a new BucketBuffer for later use in allocating
  * buckets when overflow occurs.
@@ -204,10 +209,12 @@ void probe(ThreadArg &args) {
                     args.matches += 1;
                     matches ++;
                     matchesPerKey ++;
+#if SAVE_RELATIONS_TO_FILE==1
                     ChainTuple * chainTup = cb_next_writepos(args.threadJoinResults->chainedTupBuf);
                     chainTup->key        = args.relS->tuples[i].key;    /* key */
                     chainTup->sPayload  = args.relS->tuples[i].payload; /* S-rid */
                     chainTup->rPayload  = b->tuples[j].payload;  /* R-rid */
+#endif
                 }
             }
             b = b->next;    // Follow overflow pointer.

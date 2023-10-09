@@ -10,6 +10,8 @@
 
 void allocate_hashtable(Hashtable ** ppht, uint64_t nbuckets);
 
+void deallocate_hashtable(Hashtable & ht);
+
 void init_bucket_buffer(BucketBuffer ** ppbuf);
 
 void free_bucket_buffer(BucketBuffer * buf);

@@ -32,6 +32,7 @@ class PcmMonitor {
         std::mutex mutx[15];
 
     private:
+        bool memBandwidthFlag;
         char *path;
         std::pair<double,double> ipcStats[15];
         std::pair<int,int> l2CacheStats[15];

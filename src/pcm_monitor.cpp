@@ -33,6 +33,7 @@ PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_) {
     monitoring = false;
     totalCores = totalCores_;
     corePausing = corePausing_;
+    memBandwidthFlag = false;
 
     this->path = new char[strlen(path_)+1];
     strcpy(this->path, path_);
@@ -46,6 +47,8 @@ PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_) {
         ipcStats[i].second = 0;
         lmbStats[i].first = 0;
         lmbStats[i].second = 0;
+        rmbStats[i].first = 0;
+        rmbStats[i].second = 0;
     }
 }
 
@@ -90,10 +93,11 @@ bool PcmMonitor::shouldThreadStop(int id) {
 }
 
 void PcmMonitor::makeStopDecisions() {
-    int maxStrikesTolerance = 20;
+    int maxStrikesTolerance = 10;
 
     // NOTE: core 0 is not allowed to stop.
-    for (int i = 1; i < totalCores; i++) {
+    // HERE: set which cores are allowed to stop at all
+    for (int i = 1; i < 8; i++) {
         if (threadStrikes[i] > maxStrikesTolerance) {
             threadStop[i] = true;
         } else if (threadStrikes[i] <= 0) {
@@ -115,7 +119,7 @@ void PcmMonitor::analyzeCacheStats() {
     int worstValue = 0;
     int worstCore = 0;
     int maxStrikes = 5;
-    double ipcThreshold = 1.5;
+    double ipcThreshold = 0.4;
 
     for (int i = 0; i < totalCores; i++) {
 
@@ -164,6 +168,8 @@ void PcmMonitor::runMonitoring() {
         if (corePausing) { makeStopDecisions(); }
         std::this_thread::sleep_for(std::chrono::milliseconds(400));
     }
+    memBandwidthFlag = false;
+    saveMemoryBandwidthValues();
 }
 
 
@@ -268,24 +274,27 @@ void PcmMonitor::saveIpcValues() {
 
 void PcmMonitor::saveMemoryBandwidthValues() {
 
-    std::ofstream file(this->path + std::string(MB_CSV), std::ios_base::app);
+    if (!memBandwidthFlag) {
+        std::ofstream file(this->path + std::string(MB_CSV), std::ios_base::app);
 
-    for (int i = 0; i < totalCores; i++) {
-        if (!i == 0) { file << ","; }
-        double localMemBdwth = getLocalMemoryBW(coreBeforeState[i], coreAfterState[i]);
-        file << localMemBdwth;
-        file << ",";
-        double remoteMemBdwth = getRemoteMemoryBW(coreBeforeState[i], coreAfterState[i]);
-        file << remoteMemBdwth;
+        for (int i = 0; i < totalCores; i++) {
+            if (!i == 0) { file << ","; }
+            double localMemBdwth = getLocalMemoryBW(coreBeforeState[i], coreAfterState[i]);
+            file << localMemBdwth;
+            file << ",";
+            double remoteMemBdwth = getRemoteMemoryBW(coreBeforeState[i], coreAfterState[i]);
+            file << remoteMemBdwth;
 
-        lmbStats[i].first = lmbStats[i].second;
-        lmbStats[i].second = localMemBdwth;
+            lmbStats[i].first = lmbStats[i].second;
+            lmbStats[i].second = localMemBdwth;
 
-        rmbStats[i].first = rmbStats[i].second;
-        rmbStats[i].second = remoteMemBdwth;
+            rmbStats[i].first = rmbStats[i].second;
+            rmbStats[i].second = remoteMemBdwth;
+        }
+        file << "\n";
+        file.close();
+        memBandwidthFlag = true;
     }
-    file << "\n";
-    file.close();
 }
 
 /*
