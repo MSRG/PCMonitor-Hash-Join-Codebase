@@ -19,7 +19,7 @@ const char * IPC_CSV = "IPC-results.csv";
 const char * MB_CSV = "MB-results.csv";
 const char * THREAD_RESULTS_CSV_COPY = "individual-thread-results.csv"; // Defined in thread-pool.cpp
 
-using namespace pcm;
+using namespace pcm;  
 
 static PCM * pcmInstance;
 static PCM::CustomCoreEventDescription MyEvents[4];
