@@ -24,7 +24,7 @@ const char * THREAD_RESULTS_CSV = "individual-thread-results.csv";
 
 pthread_mutex_t results_lock;
 
-ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_) {
+ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id_) {
 
     // Assign constructor arguments to class members.
     numThreads = numThreads_;
@@ -35,13 +35,16 @@ ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashta
     buildQ = &buildQ_;
     probeQ = &probeQ_;
     pcmMonitor = &pcmMonitor_;
+    id = id_;
 
     // Path for saving results.
     this->path = new char[strlen(path_)+1];
     strcpy(this->path, path_);
 
-    // Initializations.
-    joinResults = (JoinResults *) malloc(sizeof(JoinResults) * numThreads);
+    try { joinResults = (JoinResults *) malloc(sizeof(JoinResults) * numThreads); }
+    catch (std::exception& e) {
+        std::cerr << "Couldn't malloc joinResults:  " << e.what() << std::endl;
+    }
 }
 
 void ThreadPool::populateQueues() {
@@ -258,6 +261,8 @@ void ThreadPool::start() {
         printf("Couldn't create the barrier\n");
         exit(EXIT_FAILURE);
     }
+
+//    std::cout << "****** number of threads = " << numThreads << std::endl;
 
     for (i = 0; i < numThreads; i++) {
         int cpu_idx = get_cpu_id(i);

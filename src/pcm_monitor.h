@@ -8,8 +8,10 @@
 
 class PcmMonitor {
 
+    bool firstCheckpointDone;
+
     public:
-        PcmMonitor(int totalCores_, bool corePausing_, char* path_);
+        PcmMonitor(int totalCores_, bool corePausing_, char* path_, int id);
         ~PcmMonitor(void);
         void setUpMonitoring();
         void allowAllThreadsToContinue();
@@ -32,6 +34,7 @@ class PcmMonitor {
         std::mutex mutx[15];
 
     private:
+        int id;
         bool memBandwidthFlag;
         char *path;
         std::pair<double,double> ipcStats[15];

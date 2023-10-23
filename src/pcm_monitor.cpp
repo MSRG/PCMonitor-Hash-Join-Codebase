@@ -26,7 +26,7 @@ static PCM::CustomCoreEventDescription MyEvents[4];
 static CoreCounterState coreBeforeState[15];
 static CoreCounterState coreAfterState[15];
 
-PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_) {
+PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_, int id_) {
 //    std::cout << "Initializing PCM Monitor." << std::endl;
 //    std::cout << "TOTAL CORES = " << totalCores << std::endl;
 
@@ -34,11 +34,15 @@ PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_) {
     totalCores = totalCores_;
     corePausing = corePausing_;
     memBandwidthFlag = false;
+    firstCheckpointDone = false;
+    id = id_;
+
+    std::cout << "hello i am ID number " << id << std::endl;
 
     this->path = new char[strlen(path_)+1];
     strcpy(this->path, path_);
 
-    for (int i = 0; i <= totalCores; i++) {
+    for (int i = 0; i < totalCores; i++) {
         threadStop[i] = false;
         threadStrikes[i] = 0;
         l2CacheStats[i].first = 0;
@@ -97,14 +101,48 @@ void PcmMonitor::makeStopDecisions() {
 
     // NOTE: core 0 is not allowed to stop.
     // HERE: set which cores are allowed to stop at all
-    for (int i = 1; i < 8; i++) {
-        if (threadStrikes[i] > maxStrikesTolerance) {
-            threadStop[i] = true;
-        } else if (threadStrikes[i] <= 0) {
-            threadStop[i] = false;
-            cv[i].notify_one(); // in case it is waiting.
-        }
+
+    if (id == 1) { // pause: 1, 2, 3, 4
+         for (int i = 1; i < 5; i++) {
+             if (threadStrikes[i] > maxStrikesTolerance) {
+                 threadStop[i] = true;
+             } else if (threadStrikes[i] <= 0) {
+                 threadStop[i] = false;
+                 cv[i].notify_one(); // in case it is waiting.
+             }
+         }
     }
+
+    if (id == 2) { // pause: 5, 6, 7, 8
+         for (int i = 5; i < 9; i++) {
+             if (threadStrikes[i] > maxStrikesTolerance) {
+                 threadStop[i] = true;
+             } else if (threadStrikes[i] <= 0) {
+                 threadStop[i] = false;
+                 cv[i].notify_one(); // in case it is waiting.
+             }
+         }
+    }
+
+    if (id == 3) { // pause: 9, 10, 11, 12
+         for (int i = 9; i < 13; i++) {
+             if (threadStrikes[i] > maxStrikesTolerance) {
+                 threadStop[i] = true;
+             } else if (threadStrikes[i] <= 0) {
+                 threadStop[i] = false;
+                 cv[i].notify_one(); // in case it is waiting.
+             }
+         }
+    }
+
+//    for (int i = 10; i < 14; i++) {
+//        if (threadStrikes[i] > maxStrikesTolerance) {
+//            threadStop[i] = true;
+//        } else if (threadStrikes[i] <= 0) {
+//            threadStop[i] = false;
+//            cv[i].notify_one(); // in case it is waiting.
+//        }
+//    }
 }
 
 /*
@@ -168,8 +206,8 @@ void PcmMonitor::runMonitoring() {
         if (corePausing) { makeStopDecisions(); }
         std::this_thread::sleep_for(std::chrono::milliseconds(400));
     }
-    memBandwidthFlag = false;
-    saveMemoryBandwidthValues();
+//    memBandwidthFlag = false;
+//    saveMemoryBandwidthValues();
 }
 
 
@@ -274,7 +312,7 @@ void PcmMonitor::saveIpcValues() {
 
 void PcmMonitor::saveMemoryBandwidthValues() {
 
-    if (!memBandwidthFlag) {
+//    if (!memBandwidthFlag) {
         std::ofstream file(this->path + std::string(MB_CSV), std::ios_base::app);
 
         for (int i = 0; i < totalCores; i++) {
@@ -293,8 +331,8 @@ void PcmMonitor::saveMemoryBandwidthValues() {
         }
         file << "\n";
         file.close();
-        memBandwidthFlag = true;
-    }
+//        memBandwidthFlag = true;
+//    }
 }
 
 /*
@@ -310,15 +348,19 @@ void PcmMonitor::checkpointPerformanceCounters() {
         core++;
     }
 
-    saveCacheValues();
-    saveIpcValues();
-    saveMemoryBandwidthValues();
+    if (firstCheckpointDone) {  // ensures that at least one checkpoint is done so that there is a before and after val.
+
+        saveCacheValues();
+        saveIpcValues();
+        saveMemoryBandwidthValues();
+    }
     core = 0;
 
     for (int i = 0; i < totalCores; i++) {
         coreBeforeState[i] = getCoreCounterState(core);
         core++;
     }
+    firstCheckpointDone = true;
 }
 
 

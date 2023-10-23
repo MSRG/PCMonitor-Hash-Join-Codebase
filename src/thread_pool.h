@@ -25,7 +25,7 @@ class ThreadPool {
         int numThreads, taskSize;
 //        int currentTupIndex, phase;
         PcmMonitor *pcmMonitor;
-        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_);
+        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id);
         void start();
         void saveTimingResults();
         void freeThreadsIfBuildQueueEmpty();
@@ -40,6 +40,7 @@ class ThreadPool {
         void saveIndividualThreadResults(ThreadArg &args);
 
     private:
+        int id;
         char *path;
         std::vector<std::thread> threads;
         std::mutex queue_mutex;                  // Prevents data races to the job queue

@@ -9,6 +9,11 @@
 #include <iostream>
 #include <getopt.h>
 #include <cmath>
+#include <unistd.h>
+
+#include "sys/types.h"
+#include "sys/sysinfo.h"
+
 
 // Files:
 #include "types.h"
@@ -37,6 +42,58 @@ struct CmdParams {
 void print_help();
 
 void parse_args(int argc, char **argv, CmdParams * cmdParams);
+
+// Physical Memory currently used
+long long getUsedMemory(int id, int checkpoint) {
+
+    struct sysinfo memInfo;
+
+    sysinfo (&memInfo);
+    long long totalVirtualMem = memInfo.totalram;
+    //Add other values in next statement to avoid int overflow on right hand side...
+    totalVirtualMem += memInfo.totalswap;
+    totalVirtualMem *= memInfo.mem_unit;
+
+    long long virtualMemUsed = memInfo.totalram - memInfo.freeram;
+    //Add other values in next statement to avoid int overflow on right hand side...
+    virtualMemUsed += memInfo.totalswap - memInfo.freeswap;
+    virtualMemUsed *= memInfo.mem_unit;
+
+    long long physMemUsed = memInfo.totalram - memInfo.freeram;
+    //Multiply in next statement to avoid int overflow on right hand side...
+    physMemUsed *= memInfo.mem_unit;
+
+//    std::cout << "ID: " << id << ", checkpoint: " << checkpoint << " ==> Physical memory currently being used: " << physMemUsed << std::endl;
+
+    return physMemUsed;
+}
+
+// Physical Memory currently used by current process
+
+int parseLine(char* line) {
+    // This assumes that a digit will be found and the line ends in " Kb".
+    int i = strlen(line);
+    const char* p = line;
+    while (*p <'0' || *p > '9') p++;
+    line[i-3] = '\0';
+    i = atoi(p);
+    return i;
+}
+
+int getValue(){ //Note: this value is in KB!
+    FILE* file = fopen("/proc/self/status", "r");
+    int result = -1;
+    char line[128];
+
+    while (fgets(line, 128, file) != NULL){
+        if (strncmp(line, "VmRSS:", 6) == 0){
+            result = parseLine(line);
+            break;
+        }
+    }
+    fclose(file);
+    return result;
+}
 
 // *** Create relations in parallel ** //
 void create_relations(Relation &relR, Relation &relS, uint64_t rSize, uint64_t sSize, int skew, int taskSize) {
@@ -93,6 +150,7 @@ void create_relations(Relation &relR, Relation &relS, uint64_t rSize, uint64_t s
 
 int main(int argc, char **argv) {
 
+    long long usedMem, memRequired, memAvailable;
     double numOfBuildTasks, numOfProbeTasks;
     Relation relR;
     Relation relS;
@@ -124,7 +182,21 @@ int main(int argc, char **argv) {
             cmdParams.corePausing
             );
 
+//    getUsedMemory(cmdParams.id, 0);
+
+    memRequired = ((double) sizeof(Tuple) * cmdParams.sSize) + ((double) sizeof(Tuple) * cmdParams.rSize) + ((cmdParams.rSize / BUCKET_SIZE) * sizeof(Bucket));
+    memAvailable = 500000000000 - getUsedMemory(cmdParams.id, 0);
+    std::cout << "Required memory for this hash join = " << memRequired/1000000000 << " GB." << std::endl;
+    std::cout << "Available memory for this hash join = " << memAvailable/1000000000 << " GB." << std::endl;
+
+#if MONITOR_MEMORY==1
+    // -------------------- MEMORY USE MONITORING -------------------------
+    while ((400000000000 - getUsedMemory(cmdParams.id, 0)) < memRequired) { }
+    // --------------------------------------------------------------------
+#endif
+
     create_relations(relR, relS, cmdParams.rSize, cmdParams.sSize, cmdParams.skew, cmdParams.taskSize);
+//    getUsedMemory(cmdParams.id, 1);
 
     char * path;
     const char * resultsDir = "../results/";
@@ -156,7 +228,7 @@ int main(int argc, char **argv) {
     strcat(path, tmp);
 
     printf("[INFO] Initializing PCM Monitor...\n");
-    PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.corePausing, path);
+    PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.corePausing, path, cmdParams.id);
     if (cmdParams.programPMU) { pcmMonitor.setUpMonitoring(); }
 
     printf("[INFO] Initializing Hashtable...\n");
@@ -168,9 +240,7 @@ int main(int argc, char **argv) {
     pcmMonitor.startMonitorThread();
 
     printf("[INFO] Initializing ThreadPool...\n");
-    // RUN THE BUSY-CORES PROGRAM!
-//    system("cd /home/sofia/Projects/CloudDB/busy-cores && ./run.sh &");
-    ThreadPool threadPool(cmdParams.totalCores, relR, relS, *ht, cmdParams.taskSize, buildQ, probeQ, pcmMonitor, path);
+    ThreadPool threadPool(cmdParams.totalCores, relR, relS, *ht, cmdParams.taskSize, buildQ, probeQ, pcmMonitor, path, cmdParams.id);
     threadPool.populateQueues();
     threadPool.start();
 
@@ -186,7 +256,7 @@ int main(int argc, char **argv) {
     free(relS.tuples);
     free(path);
     deallocate_hashtable(*ht);
-//    std::cout << "DONE! BYE!" << std::endl;
+    std::cout << "DONE! BYE!" << std::endl;
     return 0;
 }
 
