@@ -149,6 +149,33 @@ void create_relations(Relation &relR, Relation &relS, uint64_t rSize, uint64_t s
 }
 
 int main(int argc, char **argv) {
+    int numHashJoinThreads = 2;
+
+    hashJoinThreadArg args[numHashJoinThreads];
+    pthread_t tid[numHashJoinThreads];
+
+//    cpu_set_t set;            // Linux struct representing set of CPUs.
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+
+    for (int i = 0; i < numHashJoinThreads; i++) {
+        CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
+        CPU_SET(i, &set);         // Add CPU cpu to set.
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     long long usedMem, memRequired, memAvailable;
     double numOfBuildTasks, numOfProbeTasks;
@@ -166,6 +193,9 @@ int main(int argc, char **argv) {
     cmdParams.programPMU    = true;
     cmdParams.id            = 0;
     parse_args(argc, argv, &cmdParams);
+
+
+
 
     numOfBuildTasks = ceil(double(cmdParams.rSize) / double(cmdParams.taskSize));
     numOfProbeTasks = ceil(double(cmdParams.sSize) / double(cmdParams.taskSize));

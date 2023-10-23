@@ -196,5 +196,11 @@ struct FineGrainedLock {
 //    std::mutex fineLock;
 };
 
+/**************************** MAIN HASH JOIN THREAD STRUCTS ****************************/
+
+struct hashJoinThreadArg {
+
+};
+
 
 #endif //POOL_HASHJOIN_PCM_TYPES_H
