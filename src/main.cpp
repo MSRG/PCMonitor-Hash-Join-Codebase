@@ -148,84 +148,53 @@ void create_relations(Relation &relR, Relation &relS, uint64_t rSize, uint64_t s
        pthread_join(tid[i], NULL);
 }
 
-int main(int argc, char **argv) {
-    int numHashJoinThreads = 2;
+void hashjoin(HashJoinThreadArg * args) {
+    std::cout << "HELLO!" << std::endl;
 
-    hashJoinThreadArg args[numHashJoinThreads];
-    pthread_t tid[numHashJoinThreads];
-
-//    cpu_set_t set;            // Linux struct representing set of CPUs.
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-
-    for (int i = 0; i < numHashJoinThreads; i++) {
-        CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
-        CPU_SET(i, &set);         // Add CPU cpu to set.
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
+    int id                   = args->tid;
+    uint64_t rSize           = args->rSize;
+    uint64_t sSize           = args->sSize;
+    uint64_t totalCores      = args->totalCores;
+    uint64_t taskSize        = args->taskSize;
+    bool corePausing         = args->corePausing;
+    bool programPMU          = args->programPMU;
+    GlobalHashTable *globalht = args->globalht;
+    int skew                 = args->skew;
 
     long long usedMem, memRequired, memAvailable;
     double numOfBuildTasks, numOfProbeTasks;
     Relation relR;
     Relation relS;
 
-    /* Command line parameters */
-    CmdParams cmdParams;
-    cmdParams.rSize         = 1000000;
-    cmdParams.sSize         = 1000000;
-    cmdParams.skew          = 0;
-    cmdParams.totalCores    = 14;
-    cmdParams.taskSize      = 10;
-    cmdParams.corePausing   = false;
-    cmdParams.programPMU    = true;
-    cmdParams.id            = 0;
-    parse_args(argc, argv, &cmdParams);
-
-
-
-
-    numOfBuildTasks = ceil(double(cmdParams.rSize) / double(cmdParams.taskSize));
-    numOfProbeTasks = ceil(double(cmdParams.sSize) / double(cmdParams.taskSize));
+    numOfBuildTasks = ceil(double(rSize) / double(taskSize));
+    numOfProbeTasks = ceil(double(sSize) / double(taskSize));
 
     FineGrainedQueue buildQ(numOfBuildTasks);
     FineGrainedQueue probeQ(numOfProbeTasks);
 
     fprintf(stdout,
             "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
-            cmdParams.totalCores,
-            cmdParams.taskSize,
+            totalCores,
+            taskSize,
             numOfBuildTasks,
             numOfProbeTasks,
-            cmdParams.corePausing
+            corePausing
             );
 
 //    getUsedMemory(cmdParams.id, 0);
 
-    memRequired = ((double) sizeof(Tuple) * cmdParams.sSize) + ((double) sizeof(Tuple) * cmdParams.rSize) + ((cmdParams.rSize / BUCKET_SIZE) * sizeof(Bucket));
-    memAvailable = 500000000000 - getUsedMemory(cmdParams.id, 0);
+    memRequired = ((double) sizeof(Tuple) * sSize) + ((double) sizeof(Tuple) * rSize) + ((rSize / BUCKET_SIZE) * sizeof(Bucket));
+    memAvailable = 500000000000 - getUsedMemory(id, 0);
     std::cout << "Required memory for this hash join = " << memRequired/1000000000 << " GB." << std::endl;
     std::cout << "Available memory for this hash join = " << memAvailable/1000000000 << " GB." << std::endl;
 
 #if MONITOR_MEMORY==1
     // -------------------- MEMORY USE MONITORING -------------------------
-    while ((400000000000 - getUsedMemory(cmdParams.id, 0)) < memRequired) { }
+    while ((400000000000 - getUsedMemory(id, 0)) < memRequired) { }
     // --------------------------------------------------------------------
 #endif
 
-    create_relations(relR, relS, cmdParams.rSize, cmdParams.sSize, cmdParams.skew, cmdParams.taskSize);
+    create_relations(relR, relS, rSize, sSize, skew, taskSize);
 //    getUsedMemory(cmdParams.id, 1);
 
     char * path;
@@ -236,7 +205,7 @@ int main(int argc, char **argv) {
     auto tm = *std::localtime(&t);
     std::ostringstream oss;
     oss << std::put_time(&tm, "%d-%m-%Y--%H:%M:%S--");
-    oss << cmdParams.id;
+    oss << id;
     auto datetimeStr = oss.str();
     const char * datetime = datetimeStr.c_str();
 
@@ -247,30 +216,34 @@ int main(int argc, char **argv) {
 
     // make new directory named after datetime in results folder.
     int check = mkdir(path, 0777);
-    // check if directory is created or not
-    if (check) {
+    if (check) { // check if directory is created or not
         printf("Unable to create directory for saving results.\n");
         exit(1);
     }
-
     // Update path to be used by other functions to save files.
     const char * tmp = "/";
     strcat(path, tmp);
 
     printf("[INFO] Initializing PCM Monitor...\n");
-    PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.corePausing, path, cmdParams.id);
-    if (cmdParams.programPMU) { pcmMonitor.setUpMonitoring(); }
+    PcmMonitor pcmMonitor(totalCores, corePausing, path, id);
+    if (programPMU) { pcmMonitor.setUpMonitoring(); }
 
-    printf("[INFO] Initializing Hashtable...\n");
-    Hashtable * ht;
-    uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
-    allocate_hashtable(&ht, numBuckets);
+    // this is where we check if hash table already exists.
+    if(!globalht->exists) { // create it
+        printf("[INFO] Initializing Hashtable...\n");
+//        Hashtable * ht;
+        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+        allocate_hashtable(&globalht->ht, numBuckets);
+        globalht->exists = true;
+    } else {
+        std::cout << "I am re-using an existing hash table!" << std::endl;
+    }
 
     printf("[INFO] Starting Monitoring...\n");
     pcmMonitor.startMonitorThread();
 
     printf("[INFO] Initializing ThreadPool...\n");
-    ThreadPool threadPool(cmdParams.totalCores, relR, relS, *ht, cmdParams.taskSize, buildQ, probeQ, pcmMonitor, path, cmdParams.id);
+    ThreadPool threadPool(totalCores, relR, relS, *globalht->ht, taskSize, buildQ, probeQ, pcmMonitor, path, id);
     threadPool.populateQueues();
     threadPool.start();
 
@@ -285,8 +258,63 @@ int main(int argc, char **argv) {
     free(relR.tuples);
     free(relS.tuples);
     free(path);
-    deallocate_hashtable(*ht);
+//    deallocate_hashtable(*globalht->ht);
     std::cout << "DONE! BYE!" << std::endl;
+}
+
+int main(int argc, char **argv) {
+
+    /* Command line parameters */
+    CmdParams cmdParams;
+    cmdParams.rSize         = 1000000;
+    cmdParams.sSize         = 1000000;
+    cmdParams.skew          = 0;
+    cmdParams.totalCores    = 14;
+    cmdParams.taskSize      = 10;
+    cmdParams.corePausing   = false;
+    cmdParams.programPMU    = true;
+    cmdParams.id            = 0;
+    parse_args(argc, argv, &cmdParams);
+
+    // creating threads for multiple hash joins
+    int numHashJoinThreads = 2;
+    std::vector<std::thread> threads(numHashJoinThreads);
+    HashJoinThreadArg args[numHashJoinThreads];
+    pthread_t tid[numHashJoinThreads];
+
+    // global hash table
+    GlobalHashTable globalHashTable;
+    Hashtable ht;
+    globalHashTable.exists = false;
+    globalHashTable.ht = &ht;
+
+    cpu_set_t set;            // Linux struct representing set of CPUs.
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+
+
+    for (int i = 0; i < numHashJoinThreads; i++) {
+        CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
+        CPU_SET(i, &set);               // Add CPU cpu to set.
+
+        args[i].rSize       = cmdParams.rSize;
+        args[i].sSize       = cmdParams.sSize;
+        args[i].totalCores  = cmdParams.totalCores;
+        args[i].taskSize    = cmdParams.taskSize;
+        args[i].corePausing = cmdParams.corePausing;
+        args[i].programPMU  = cmdParams.programPMU;
+        args[i].skew        = cmdParams.skew;
+        args[i].globalht    = &globalHashTable;
+        args[i].tid         = i;
+
+        threads[i] = thread (hashjoin, &args[i]);
+        sleep(1);
+    }
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
     return 0;
 }
 

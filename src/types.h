@@ -35,6 +35,8 @@ typedef struct TupleBuffer          TupleBuffer;
 
 typedef struct FineGrainedLock      FineGrainedLock;
 
+typedef struct GlobalHashTable      GlobalHashTable;
+
 
 using namespace std::chrono;
 
@@ -198,8 +200,22 @@ struct FineGrainedLock {
 
 /**************************** MAIN HASH JOIN THREAD STRUCTS ****************************/
 
-struct hashJoinThreadArg {
+struct HashJoinThreadArg {
+    int tid;
+    uint64_t rSize;
+    uint64_t sSize;
+    uint64_t totalCores;
+    uint64_t taskSize;
+    bool corePausing;   // Allow cores to stop depending on performance counter info.
+    bool programPMU;    // Program the PMU.
+    int skew;
+    GlobalHashTable * globalht;
+//    int id;
+};
 
+struct GlobalHashTable {
+    bool exists;
+    Hashtable * ht;
 };
 
 
