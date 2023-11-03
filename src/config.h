@@ -8,7 +8,7 @@
 #define MONITOR_MEMORY 0
 
 /** Analysis **/
-#define SAVE_RELATIONS_TO_FILE 1
+#define SAVE_RELATIONS_TO_FILE 0
 
 /** Algorithm Parameters **/
 #define BUCKET_SIZE 2

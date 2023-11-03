@@ -37,6 +37,7 @@ struct CmdParams {
     bool programPMU;    // Program the PMU.
     int skew;
     int id;
+    int hashJoinThreads;
 };
 
 void print_help();
@@ -80,7 +81,7 @@ int parseLine(char* line) {
     return i;
 }
 
-int getValue(){ //Note: this value is in KB!
+int getValue(){ // Note: this value is in KB!
     FILE* file = fopen("/proc/self/status", "r");
     int result = -1;
     char line[128];
@@ -149,18 +150,18 @@ void create_relations(Relation &relR, Relation &relS, uint64_t rSize, uint64_t s
 }
 
 void hashjoin(HashJoinThreadArg * args) {
-    std::cout << "HELLO!" << std::endl;
 
-    int id                   = args->tid;
-    uint64_t rSize           = args->rSize;
-    uint64_t sSize           = args->sSize;
-    uint64_t totalCores      = args->totalCores;
-    uint64_t taskSize        = args->taskSize;
-    bool corePausing         = args->corePausing;
-    bool programPMU          = args->programPMU;
-    GlobalHashTable *globalht = args->globalht;
-    int skew                 = args->skew;
+    int id                      = args->tid;
+    uint64_t rSize              = args->rSize;
+    uint64_t sSize              = args->sSize;
+    uint64_t totalCores         = args->totalCores;
+    uint64_t taskSize           = args->taskSize;
+    bool corePausing            = args->corePausing;
+    bool programPMU             = args->programPMU;
+    GlobalHashTable *globalht   = args->globalht;
+    int skew                    = args->skew;
 
+    bool skipBuild = false;
     long long usedMem, memRequired, memAvailable;
     double numOfBuildTasks, numOfProbeTasks;
     Relation relR;
@@ -228,36 +229,86 @@ void hashjoin(HashJoinThreadArg * args) {
     PcmMonitor pcmMonitor(totalCores, corePausing, path, id);
     if (programPMU) { pcmMonitor.setUpMonitoring(); }
 
-    // this is where we check if hash table already exists.
-    if(!globalht->exists) { // create it
-        printf("[INFO] Initializing Hashtable...\n");
-//        Hashtable * ht;
-        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
-        allocate_hashtable(&globalht->ht, numBuckets);
-        globalht->exists = true;
-    } else {
-        std::cout << "I am re-using an existing hash table!" << std::endl;
-    }
+//    // This is where we check if hash table already exists.
+//    if (!globalht->built) { // Hash table is not built.
+//        if (!globalht->inCreation) { // No one is building it yet.
+//
+//            printf("[INFO] Creating Global Hashtable...\n");
+//            globalht->inCreation = true;
+//            uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+//            allocate_hashtable(&globalht->ht, numBuckets);
+//
+//            printf("[INFO] Starting Monitoring...\n");
+//            if (programPMU) { pcmMonitor.startMonitorThread(); }
+//
+//            printf("[INFO] Initializing ThreadPool...\n");
+//            ThreadPool threadPool(totalCores, relR, relS, *globalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
+//
+//            threadPool.populateQueues();
+//            threadPool.start();
+//
+//            if (programPMU) {
+//                pcmMonitor.setMonitoringToFalse();
+//                pcmMonitor.stopMonitoring();
+//            }
+//
+//        } else { // Create a new hash table just for this join.
 
-    printf("[INFO] Starting Monitoring...\n");
-    pcmMonitor.startMonitorThread();
+                printf("[INFO] Global Hashtable not ready, making my own...\n");
+                GlobalHashTable ownGlobalht;
+                Hashtable * ht;
+                uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+                allocate_hashtable(&ht, numBuckets);
+                ownGlobalht.ht = ht;
+                ownGlobalht.built = false;
+                ownGlobalht.inCreation = false;
 
-    printf("[INFO] Initializing ThreadPool...\n");
-    ThreadPool threadPool(totalCores, relR, relS, *globalht->ht, taskSize, buildQ, probeQ, pcmMonitor, path, id);
-    threadPool.populateQueues();
-    threadPool.start();
+                printf("[INFO] Starting Monitoring...\n");
+                if (programPMU) { pcmMonitor.startMonitorThread(); }
 
-    pcmMonitor.setMonitoringToFalse();
-    pcmMonitor.stopMonitoring();
+                printf("[INFO] Initializing ThreadPool...\n");
+                ThreadPool threadPool(totalCores, relR, relS, ownGlobalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
+
+                printf("[INFO] Populating Queues...\n");
+                threadPool.populateQueues();
+
+                printf("[INFO] Start Hash Join...\n");
+                threadPool.start();
+
+                if (programPMU) {
+                    pcmMonitor.setMonitoringToFalse();
+                    pcmMonitor.stopMonitoring();
+                }
+//        }
+//    } else {
+//        std::cout << "[INFO] I am using the Global Hashtable..." << std::endl;
+//        skipBuild = true;
+//
+//        printf("[INFO] Starting Monitoring...\n");
+//        if (programPMU) { pcmMonitor.startMonitorThread(); }
+//
+//        printf("[INFO] Initializing ThreadPool...\n");
+//        ThreadPool threadPool(totalCores, relR, relS, *globalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
+//
+//        threadPool.populateQueues();
+//        threadPool.start();
+//
+//        if (programPMU) {
+//            pcmMonitor.setMonitoringToFalse();
+//            pcmMonitor.stopMonitoring();
+//        }
+//    }
+
+
 
 #if SAVE_RELATIONS_TO_FILE==1
     threadPool.saveJoinedRelationToFile();
 #endif
 
     std::cout << "free stuff.." << std::endl;
-    free(relR.tuples);
-    free(relS.tuples);
-    free(path);
+//    free(relR.tuples);
+//    free(relS.tuples);
+//    free(path);
 //    deallocate_hashtable(*globalht->ht);
     std::cout << "DONE! BYE!" << std::endl;
 }
@@ -266,26 +317,30 @@ int main(int argc, char **argv) {
 
     /* Command line parameters */
     CmdParams cmdParams;
-    cmdParams.rSize         = 1000000;
-    cmdParams.sSize         = 1000000;
-    cmdParams.skew          = 0;
-    cmdParams.totalCores    = 14;
-    cmdParams.taskSize      = 10;
-    cmdParams.corePausing   = false;
-    cmdParams.programPMU    = true;
-    cmdParams.id            = 0;
+    cmdParams.rSize             = 1000000;
+    cmdParams.sSize             = 1000000;
+    cmdParams.skew              = 0;
+    cmdParams.totalCores        = 14;
+    cmdParams.taskSize          = 10;
+    cmdParams.corePausing       = false;
+    cmdParams.programPMU        = true;
+    cmdParams.id                = 0;
+    cmdParams.hashJoinThreads   = 1;
     parse_args(argc, argv, &cmdParams);
 
+    bool threadSleep = true;
+
     // creating threads for multiple hash joins
-    int numHashJoinThreads = 2;
-    std::vector<std::thread> threads(numHashJoinThreads);
-    HashJoinThreadArg args[numHashJoinThreads];
-    pthread_t tid[numHashJoinThreads];
+//    int numHashJoinThreads = 5;
+    std::vector<std::thread> threads(cmdParams.hashJoinThreads);
+    HashJoinThreadArg args[cmdParams.hashJoinThreads];
+    pthread_t tid[cmdParams.hashJoinThreads];
 
     // global hash table
     GlobalHashTable globalHashTable;
     Hashtable ht;
-    globalHashTable.exists = false;
+    globalHashTable.built = false;
+    globalHashTable.inCreation = false;
     globalHashTable.ht = &ht;
 
     cpu_set_t set;            // Linux struct representing set of CPUs.
@@ -293,7 +348,7 @@ int main(int argc, char **argv) {
     pthread_attr_init(&attr);
 
 
-    for (int i = 0; i < numHashJoinThreads; i++) {
+    for (int i = 0; i < cmdParams.hashJoinThreads; i++) {
         CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
         CPU_SET(i, &set);               // Add CPU cpu to set.
 
@@ -308,7 +363,11 @@ int main(int argc, char **argv) {
         args[i].tid         = i;
 
         threads[i] = thread (hashjoin, &args[i]);
-        sleep(1);
+
+        if (threadSleep) {
+            sleep(100);
+            threadSleep = false;
+        }
     }
 
     for (auto& th : threads) {
@@ -344,6 +403,7 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
                 {"core-pausing",    required_argument, 0, 'p'},
                 {"program-pmu",     required_argument, 0, 'm'},
                 {"id",              required_argument, 0, 'i'},
+                {"hj-threads",      required_argument, 0, 'h'},
             };
 
         /* getopt_long stores the option index here. */
@@ -389,6 +449,9 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
                 break;
             case 'i':
                 cmdParams->id = atof(optarg);
+                break;
+            case 'h':
+                cmdParams->hashJoinThreads = atof(optarg);
                 break;
             default:
                 break;

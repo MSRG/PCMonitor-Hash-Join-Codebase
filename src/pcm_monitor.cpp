@@ -58,7 +58,7 @@ PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_, int id_
 
 PcmMonitor::~PcmMonitor(void) {
 //  std::cout << "PcmMonitor is being deleted" << std::endl;
-   free(this->path);
+//   free(this->path);
 }
 
 void PcmMonitor::setUpMonitoring() {

@@ -16,16 +16,17 @@ class ThreadPool {
 
     public:
         Relation *relR, *relS;
-        Hashtable *ht;
+        GlobalHashTable *ht;
         JoinResults *joinResults;
         FineGrainedQueue *buildQ;
         FineGrainedQueue *probeQ;
         Timestamps ts;
         struct timeval startTime;
         int numThreads, taskSize;
+        bool skipBuild;
 //        int currentTupIndex, phase;
         PcmMonitor *pcmMonitor;
-        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id);
+        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, GlobalHashTable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id_, bool skipBuild_);
         void start();
         void saveTimingResults();
         void freeThreadsIfBuildQueueEmpty();

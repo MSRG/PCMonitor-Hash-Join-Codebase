@@ -128,7 +128,7 @@ void build(ThreadArg &args) {
 
     uint64_t i;
     QueueTask task = *args.task;
-    Hashtable ht = *args.ht;
+    Hashtable ht = *args.ht->ht;
     BucketBuffer *overflowBuf = args.overflowBuf;
     uint64_t startTup = task.startTupleIndex;
     uint64_t endTup = task.endTupleIndex;
@@ -136,8 +136,8 @@ void build(ThreadArg &args) {
 //    std::cout << "building" << std::endl;
 //    std::cout << "start = " << startTup << " end = " << endTup << "\n" << std::endl;
 
-    const uint64_t hashmask = args.ht->hash_mask;
-    const uint64_t skipbits = args.ht->skip_bits;
+    const uint64_t hashmask = args.ht->ht->hash_mask;
+    const uint64_t skipbits = args.ht->ht->skip_bits;
 
     // Loop through all tuples assigned to this thread.
     for (i = startTup; i <= endTup; i++) {
@@ -178,7 +178,7 @@ void build(ThreadArg &args) {
 void probe(ThreadArg &args) {
 
     QueueTask task = *args.task;
-    Hashtable ht = *args.ht;
+    Hashtable ht = *args.ht->ht;
     BucketBuffer *overflowBuf = args.overflowBuf;
     uint64_t startTup = task.startTupleIndex;
     uint64_t endTup = task.endTupleIndex;
@@ -190,8 +190,8 @@ void probe(ThreadArg &args) {
     int64_t matches = 0;
     int64_t matchesExist = 1;      // did this to be able to compare with matches.
     int64_t matchesPerKey = 0;
-    const uint64_t hashmask = args.ht->hash_mask;
-    const uint64_t skipbits = args.ht->skip_bits;
+    const uint64_t hashmask = args.ht->ht->hash_mask;
+    const uint64_t skipbits = args.ht->ht->skip_bits;
 
     args.completedTasks += 1;
 

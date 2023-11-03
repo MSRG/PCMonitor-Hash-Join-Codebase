@@ -154,13 +154,14 @@ struct RelFillThreadArg {
 
 struct ThreadArg {
     int tid;
+    int cid;
     uint64_t taskSize;
     uint64_t completedTasks;
     uint64_t matches;
     uint64_t nonMatchTasks;
     uint64_t matchTasks;
     int lastTaskVectorPosition;
-    Hashtable *ht;
+    GlobalHashTable *ht;
     Relation *relR;
     Relation *relS;
     QueueTask  *task;
@@ -214,7 +215,8 @@ struct HashJoinThreadArg {
 };
 
 struct GlobalHashTable {
-    bool exists;
+    bool built;
+    bool inCreation;
     Hashtable * ht;
 };
 

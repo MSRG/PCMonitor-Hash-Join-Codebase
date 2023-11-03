@@ -24,7 +24,7 @@ const char * THREAD_RESULTS_CSV = "individual-thread-results.csv";
 
 pthread_mutex_t results_lock;
 
-ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id_) {
+ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, GlobalHashTable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id_, bool skipBuild_) {
 
     // Assign constructor arguments to class members.
     numThreads = numThreads_;
@@ -36,6 +36,7 @@ ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashta
     probeQ = &probeQ_;
     pcmMonitor = &pcmMonitor_;
     id = id_;
+    skipBuild = skipBuild_;
 
     // Path for saving results.
     this->path = new char[strlen(path_)+1];
@@ -158,32 +159,32 @@ void ThreadPool::freeThreadsIfProbeQueueEmpty() {
 }
 
 bool ThreadPool::checkThreadStatusDuringBuild(ThreadArg &args) {
-    if (!pcmMonitor->shouldThreadStop(args.tid)) {
+    if (!pcmMonitor->shouldThreadStop(args.cid)) {
         return true; // Thread is good to continue working.
     } else {
-        std::cout << "thread " << args.tid << " is haulting work on build." << std::endl;
+        std::cout << "thread " << args.cid << " is haulting work on build." << std::endl;
         // lock.
-        std::unique_lock<std::mutex> lk(pcmMonitor->mutx[args.tid]);
+        std::unique_lock<std::mutex> lk(pcmMonitor->mutx[args.cid]);
         // wait.
-        pcmMonitor->cv[args.tid].wait(lk);
+        pcmMonitor->cv[args.cid].wait(lk);
         // has been notified.
-        std::cout << "thread " << args.tid << " is resuming work in build." << std::endl;
+        std::cout << "thread " << args.cid << " is resuming work in build." << std::endl;
 
         return true;
     }
 }
 
 bool ThreadPool::checkThreadStatusDuringProbe(ThreadArg &args) {
-    if (!pcmMonitor->shouldThreadStop(args.tid)) {
+    if (!pcmMonitor->shouldThreadStop(args.cid)) {
         return true; // Thread is good to continue working.
     } else {
-        std::cout << "thread " << args.tid << " is haulting work on probe." << std::endl;
+        std::cout << "thread " << args.cid << " is haulting work on probe." << std::endl;
         // lock.
-        std::unique_lock<std::mutex> lk(pcmMonitor->mutx[args.tid]);
+        std::unique_lock<std::mutex> lk(pcmMonitor->mutx[args.cid]);
         // wait.
-        pcmMonitor->cv[args.tid].wait(lk);
+        pcmMonitor->cv[args.cid].wait(lk);
         // has been notified.
-        std::cout << "thread " << args.tid << " is resuming work in probe." << std::endl;
+        std::cout << "thread " << args.cid << " is resuming work in probe." << std::endl;
         return true;
     }
 }
@@ -202,10 +203,14 @@ void ThreadPool::run(ThreadArg * args) {
         gettimeofday(&(ts.startTime), NULL);
     }
 
-    while (checkThreadStatusDuringBuild(*args)) {
-        if (buildQ->dequeue(*(args->task), args->lastTaskVectorPosition)) {
-            (args->task->function)(*args);
-        } else { break; }
+    if (!skipBuild) {
+        while (checkThreadStatusDuringBuild(*args)) {
+            if (buildQ->dequeue(*(args->task), args->lastTaskVectorPosition)) {
+                (args->task->function)(*args);
+            } else { break; }
+        }
+        args->ht->built = true;
+        args->ht->inCreation = false;
     }
 
 //    freeThreadsIfBuildQueueEmpty();
@@ -238,7 +243,9 @@ void ThreadPool::run(ThreadArg * args) {
     }
 
     args->nonMatchTasks = (args->completedTasks - args->matchTasks);
+//    std::cout << "1" << std::endl;
     saveIndividualThreadResults(*args);
+//    std::cout << "2" << std::endl;
     free_bucket_buffer(args->overflowBuf); // Clean-up the overflow buffers.
 }
 
@@ -269,10 +276,14 @@ void ThreadPool::start() {
         CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
         CPU_SET(cpu_idx, &set);         // Add CPU cpu to set.
 
+//        std::cout << i << std::endl;
+//        std::cout << cpu_idx << std::endl;
+
         ChainedTupleBuffer * chainedTupBuf = chainedtuplebuffer_init();
 
         // Thread arg set-up.
         args[i].tid = i;
+        args[i].cid = cpu_idx;
         args[i].matches = 0;
         args[i].completedTasks = 0;
         args[i].matchTasks = 0;
@@ -296,7 +307,6 @@ void ThreadPool::start() {
           std::cerr << "Error calling pthread_setaffinity_np: " << rv << "\n";
         }
     }
-
     stop();
     saveTimingResults();
     pthread_barrier_destroy(&barrier);

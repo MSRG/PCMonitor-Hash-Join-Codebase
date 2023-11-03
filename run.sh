@@ -1,9 +1,9 @@
 #!/bin/bash
 cd build
 
-#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=8500000000 --s-size=8500000000 --total-cores=4 --task-size=5000000 --skew=0 --core-pausing=0 --program-pmu=1
+sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=50 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1 --hj-threads=1
 
-sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=100  --s-size=100 --total-cores=15 --task-size=10 --skew=0 --core-pausing=0 --program-pmu=1
+#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1
 
 # MEMORY SIZE EXPERIMENTS
 # 32 GB -- previous default max
