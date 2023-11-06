@@ -45,22 +45,24 @@ cd build
 #sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=2 --r-size=8500000000  --s-size=8500000000 --total-cores=2 --task-size=5000000 --skew=0 --core-pausing=0 --program-pmu=1
 #sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=1 --r-size=8500000000  --s-size=8500000000 --total-cores=1 --task-size=5000000 --skew=0 --core-pausing=0 --program-pmu=1
 
-
+#for i in {1...5}
+#do
 # CONCURRENT EXPERIMENTS
-(sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-(
-##sleep 4
-sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=1 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-(
-##sleep 8
-sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=2 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-(
-##sleep 12
-sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=3 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-#(
-#sleep 45
-#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=4 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+#  sleep 4
+  sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=1 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+#  sleep 8
+  sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=2 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+#  sleep 12
+  sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=3 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sleep 45
+  sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=4 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
 
+#done
 
 # LOOP EXPERIMENTS
 #for i in {1..10}

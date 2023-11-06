@@ -37,8 +37,6 @@ PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_, int id_
     firstCheckpointDone = false;
     id = id_;
 
-    std::cout << "hello i am ID number " << id << std::endl;
-
     this->path = new char[strlen(path_)+1];
     strcpy(this->path, path_);
 
@@ -102,38 +100,48 @@ void PcmMonitor::makeStopDecisions() {
     // NOTE: core 0 is not allowed to stop.
     // HERE: set which cores are allowed to stop at all
 
-    if (id == 1) { // pause: 1, 2, 3, 4
-         for (int i = 1; i < 5; i++) {
-             if (threadStrikes[i] > maxStrikesTolerance) {
-                 threadStop[i] = true;
-             } else if (threadStrikes[i] <= 0) {
-                 threadStop[i] = false;
-                 cv[i].notify_one(); // in case it is waiting.
-             }
-         }
+    for (int i = 1; i < 8; i++) {
+        if (threadStrikes[i] > maxStrikesTolerance) {
+            threadStop[i] = true;
+        } else if (threadStrikes[i] <= 0) {
+            threadStop[i] = false;
+            cv[i].notify_one(); // in case it is waiting.
+        }
     }
 
-    if (id == 2) { // pause: 5, 6, 7, 8
-         for (int i = 5; i < 9; i++) {
-             if (threadStrikes[i] > maxStrikesTolerance) {
-                 threadStop[i] = true;
-             } else if (threadStrikes[i] <= 0) {
-                 threadStop[i] = false;
-                 cv[i].notify_one(); // in case it is waiting.
-             }
-         }
-    }
 
-    if (id == 3) { // pause: 9, 10, 11, 12
-         for (int i = 9; i < 13; i++) {
-             if (threadStrikes[i] > maxStrikesTolerance) {
-                 threadStop[i] = true;
-             } else if (threadStrikes[i] <= 0) {
-                 threadStop[i] = false;
-                 cv[i].notify_one(); // in case it is waiting.
-             }
-         }
-    }
+//    if (id == 1) { // pause: use 15 for all.
+//         for (int i = 1; i < 8; i++) {
+//             if (threadStrikes[i] > maxStrikesTolerance) {
+//                 threadStop[i] = true;
+//             } else if (threadStrikes[i] <= 0) {
+//                 threadStop[i] = false;
+//                 cv[i].notify_one(); // in case it is waiting.
+//             }
+//         }
+//    }
+//
+//    if (id == 2) { // pause: 5, 6, 7, 8
+//         for (int i = 5; i < 9; i++) {
+//             if (threadStrikes[i] > maxStrikesTolerance) {
+//                 threadStop[i] = true;
+//             } else if (threadStrikes[i] <= 0) {
+//                 threadStop[i] = false;
+//                 cv[i].notify_one(); // in case it is waiting.
+//             }
+//         }
+//    }
+//
+//    if (id == 3) { // pause: 9, 10, 11, 12
+//         for (int i = 9; i < 13; i++) {
+//             if (threadStrikes[i] > maxStrikesTolerance) {
+//                 threadStop[i] = true;
+//             } else if (threadStrikes[i] <= 0) {
+//                 threadStop[i] = false;
+//                 cv[i].notify_one(); // in case it is waiting.
+//             }
+//         }
+//    }
 
 //    for (int i = 10; i < 14; i++) {
 //        if (threadStrikes[i] > maxStrikesTolerance) {

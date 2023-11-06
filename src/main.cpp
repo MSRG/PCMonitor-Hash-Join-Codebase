@@ -189,11 +189,13 @@ int main(int argc, char **argv) {
     std::cout << "Required memory for this hash join = " << memRequired/1000000000 << " GB." << std::endl;
     std::cout << "Available memory for this hash join = " << memAvailable/1000000000 << " GB." << std::endl;
 
+
+// -------------------- MEMORY USE MONITORING -------------------------
 #if MONITOR_MEMORY==1
-    // -------------------- MEMORY USE MONITORING -------------------------
     while ((400000000000 - getUsedMemory(cmdParams.id, 0)) < memRequired) { }
-    // --------------------------------------------------------------------
 #endif
+// --------------------------------------------------------------------
+
 
     create_relations(relR, relS, cmdParams.rSize, cmdParams.sSize, cmdParams.skew, cmdParams.taskSize);
 //    getUsedMemory(cmdParams.id, 1);

@@ -5,7 +5,7 @@
 #ifndef POOL_HASHJOIN_PCM_CONFIG_H
 #define POOL_HASHJOIN_PCM_CONFIG_H
 
-#define MONITOR_MEMORY 0
+#define MONITOR_MEMORY 1
 
 /** Analysis **/
 #define SAVE_RELATIONS_TO_FILE 0
