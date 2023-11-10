@@ -361,10 +361,10 @@ int main(int argc, char **argv) {
 
         threads[i] = thread (hashjoin, &args[i]);
 
-        if (threadSleep) {
-            sleep(100);
-            threadSleep = false;
-        }
+//        if (threadSleep) {
+//            sleep(100);
+//            threadSleep = false;
+//        }
     }
 
     for (auto& th : threads) {
