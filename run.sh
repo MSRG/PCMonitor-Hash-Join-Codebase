@@ -3,7 +3,7 @@ cd build
 
 #for i in {1..5}
 #  do
-    sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1 --hj-threads=7
+    sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1 --hj-threads=5
 #done
 
 
