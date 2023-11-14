@@ -36,6 +36,8 @@ struct CmdParams {
     uint64_t taskSize;
     bool corePausing;   // Allow cores to stop depending on performance counter info.
     bool programPMU;    // Program the PMU.
+    bool shareHt;       // Share global hash table among threads.
+    int  hjThreads;     // Number of hash join kernel threads.
     int skew;
     int id;
 };
@@ -167,6 +169,8 @@ int main(int argc, char **argv) {
     cmdParams.corePausing       = false;
     cmdParams.programPMU        = true;
     cmdParams.id                = 0;
+    cmdParams.hjThreads         = 1;
+    cmdParams.shareHt           = false;
     parse_args(argc, argv, &cmdParams);
 
     numOfBuildTasks = ceil(double(cmdParams.rSize) / double(cmdParams.taskSize));
@@ -274,7 +278,6 @@ void print_help(const char * progname) {
     \n");
 }
 
-
 void parse_args(int argc, char **argv, CmdParams * cmdParams) {
     int c;
 
@@ -286,6 +289,8 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
                 {"total-cores",     required_argument, 0, 'c'},
                 {"monitor-cores",   required_argument, 0, 'n'},
                 {"task-size",       required_argument, 0, 't'},
+                {"hj-threads",      required_argument, 0, 'l'},
+                {"share-hash-table",required_argument, 0, 'h'},
                 {"skew",            required_argument, 0, 'k'},
                 {"core-pausing",    required_argument, 0, 'p'},
                 {"program-pmu",     required_argument, 0, 'm'},
@@ -326,6 +331,12 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
                 break;
             case 't':
                 cmdParams->taskSize = atof(optarg);
+                break;
+            case 'l':
+                cmdParams->hjThreads = atof(optarg);
+                break;
+            case 'h':
+                cmdParams->shareHt = atof(optarg);
                 break;
             case 'k':
                 cmdParams->skew = atof(optarg);
