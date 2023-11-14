@@ -198,7 +198,6 @@ int main(int argc, char **argv) {
 #endif
 // --------------------------------------------------------------------
 
-
     create_relations(relR, relS, cmdParams.rSize, cmdParams.sSize, cmdParams.skew, cmdParams.taskSize);
 //    getUsedMemory(cmdParams.id, 1);
 

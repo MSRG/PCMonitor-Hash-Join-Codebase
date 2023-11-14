@@ -47,52 +47,112 @@ cd build
 
 #sudo perf stat -e cpu-clock
 
+ (sudo ./Pool-HashJoin-PCM --id=0 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=1 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=2 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=3 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=4 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=5 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=6 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=7 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=8 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=9 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=10 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=11 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=12 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=13 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=14 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=15 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+  (
+  sudo ./Pool-HashJoin-PCM --id=16 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+
+
 #for i in {1...5}
 #do
-# CONCURRENT EXPERIMENTS
-  (sudo ./Pool-HashJoin-PCM --id=0 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=1 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=2 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=3 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=4 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=5 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=6 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=7 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=8 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=9 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=10 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=11 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=12 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=3 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=14 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=15 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=16 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=17 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=18 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=19 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=20 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
-  (
-  sudo ./Pool-HashJoin-PCM --id=21 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+## CONCURRENT EXPERIMENTS
+#  (sudo ./Pool-HashJoin-PCM --id=0 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=1 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=2 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=3 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=4 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=5 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=6 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=7 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=8 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=9 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=10 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=11 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=12 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=13 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=14 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=15 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=16 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=17 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=18 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=19 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=20 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=21 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=22 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=23 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=24 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=25 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=26 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=27 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=28 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=29 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=30 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=31 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=32 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  (
+#  sudo ./Pool-HashJoin-PCM --id=33 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#
 
 
 #  (
