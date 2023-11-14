@@ -26,12 +26,13 @@ static PCM::CustomCoreEventDescription MyEvents[4];
 static CoreCounterState coreBeforeState[15];
 static CoreCounterState coreAfterState[15];
 
-PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_, int id_) {
+PcmMonitor::PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool corePausing_, char * path_, int id_) {
 //    std::cout << "Initializing PCM Monitor." << std::endl;
 //    std::cout << "TOTAL CORES = " << totalCores << std::endl;
 
     monitoring = false;
-    totalCores = totalCores_;
+    totalCoresUsed = totalCoresUsed_;
+    totalCoresMonitored = totalCoresMonitored_;
     corePausing = corePausing_;
     memBandwidthFlag = false;
     firstCheckpointDone = false;
@@ -40,7 +41,7 @@ PcmMonitor::PcmMonitor(int totalCores_, bool corePausing_, char * path_, int id_
     this->path = new char[strlen(path_)+1];
     strcpy(this->path, path_);
 
-    for (int i = 0; i < totalCores; i++) {
+    for (int i = 0; i < totalCoresMonitored; i++) {
         threadStop[i] = false;
         threadStrikes[i] = 0;
         l2CacheStats[i].first = 0;
@@ -75,7 +76,7 @@ void PcmMonitor::setUpMonitoring() {
         std::cout << "pcmInstance->good() FAILED:" << status << std::endl;
     }
 
-     for (int i = 0; i < totalCores; i++) {
+     for (int i = 0; i < totalCoresMonitored; i++) {
         coreBeforeState[i] = getCoreCounterState(core);
         core++;
     }
@@ -85,7 +86,7 @@ void PcmMonitor::setUpMonitoring() {
 }
 
 void PcmMonitor::allowAllThreadsToContinue() {
-    for (int i = 0; i < totalCores; i++) {
+    for (int i = 0; i < totalCoresUsed; i++) {
         threadStop[i] = false;
     }
 }
@@ -167,7 +168,7 @@ void PcmMonitor::analyzeCacheStats() {
     int maxStrikes = 5;
     double ipcThreshold = 0.4;
 
-    for (int i = 0; i < totalCores; i++) {
+    for (int i = 0; i < totalCoresUsed; i++) {
 
         if (ipcStats[i].second > ipcThreshold) {
             threadStrikes[i] += 1;
@@ -292,7 +293,7 @@ void PcmMonitor::saveCacheValues() {
 
     std::ofstream file(this->path + std::string(CACHE_PATH), std::ios_base::app);
 
-    for (int i = 0; i < totalCores; i++) {
+    for (int i = 0; i < totalCoresMonitored; i++) {
         if (!i == 0) { file << ","; }
         int misses = getL2CacheMisses(coreBeforeState[i], coreAfterState[i]);
         file << misses;
@@ -307,7 +308,7 @@ void PcmMonitor::saveIpcValues() {
 
     std::ofstream file(this->path + std::string(IPC_CSV), std::ios_base::app);
 
-    for (int i = 0; i < totalCores; i++) {
+    for (int i = 0; i < totalCoresMonitored; i++) {
         if (!i == 0) { file << ","; }
         double ipc = getIPC(coreBeforeState[i], coreAfterState[i]);
         file << ipc;
@@ -323,7 +324,7 @@ void PcmMonitor::saveMemoryBandwidthValues() {
 //    if (!memBandwidthFlag) {
         std::ofstream file(this->path + std::string(MB_CSV), std::ios_base::app);
 
-        for (int i = 0; i < totalCores; i++) {
+        for (int i = 0; i < totalCoresMonitored; i++) {
             if (!i == 0) { file << ","; }
             double localMemBdwth = getLocalMemoryBW(coreBeforeState[i], coreAfterState[i]);
             file << localMemBdwth;
@@ -351,20 +352,19 @@ void PcmMonitor::checkpointPerformanceCounters() {
 
     uint32 core = 0;
 
-    for (int i = 0; i < totalCores; i++) {
+    for (int i = 0; i < totalCoresMonitored; i++) {
         coreAfterState[i] = getCoreCounterState(core);
         core++;
     }
 
     if (firstCheckpointDone) {  // ensures that at least one checkpoint is done so that there is a before and after val.
-
         saveCacheValues();
         saveIpcValues();
         saveMemoryBandwidthValues();
     }
     core = 0;
 
-    for (int i = 0; i < totalCores; i++) {
+    for (int i = 0; i < totalCoresMonitored; i++) {
         coreBeforeState[i] = getCoreCounterState(core);
         core++;
     }

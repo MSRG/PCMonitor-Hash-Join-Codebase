@@ -32,6 +32,7 @@ struct CmdParams {
     uint64_t rSize;
     uint64_t sSize;
     uint64_t totalCores;
+    uint64_t coresToMonitor;
     uint64_t taskSize;
     bool corePausing;   // Allow cores to stop depending on performance counter info.
     bool programPMU;    // Program the PMU.
@@ -126,8 +127,8 @@ void create_relations(Relation &relR, Relation &relS, uint64_t rSize, uint64_t s
 
 // *** RELATION S ***
     fprintf(stdout,
-            "\n[INFO] Creating relation R:\n-- Number of tuples = %lu,\n-- %.3lf mebibytes,\n-- %.3lf bytes,\n-- %.3lf GB\n\n",
-            (unsigned long)rSize,
+            "\n[INFO] Creating relation S:\n-- Number of tuples = %lu,\n-- %.3lf mebibytes,\n-- %.3lf bytes,\n-- %.3lf GB\n\n",
+            (unsigned long)sSize,
             (double) sizeof(Tuple) * sSize/1024.0/1024.0,
             (double) sizeof(Tuple) * sSize,
             (double) sizeof(Tuple) * sSize/1000000000
@@ -157,14 +158,15 @@ int main(int argc, char **argv) {
 
     /* Command line parameters */
     CmdParams cmdParams;
-    cmdParams.rSize         = 1000000;
-    cmdParams.sSize         = 1000000;
-    cmdParams.skew          = 0;
-    cmdParams.totalCores    = 14;
-    cmdParams.taskSize      = 10;
-    cmdParams.corePausing   = false;
-    cmdParams.programPMU    = true;
-    cmdParams.id            = 0;
+    cmdParams.rSize             = 1000000;
+    cmdParams.sSize             = 1000000;
+    cmdParams.skew              = 0;
+    cmdParams.totalCores        = 15;
+    cmdParams.coresToMonitor    = 15;
+    cmdParams.taskSize          = 10;
+    cmdParams.corePausing       = false;
+    cmdParams.programPMU        = true;
+    cmdParams.id                = 0;
     parse_args(argc, argv, &cmdParams);
 
     numOfBuildTasks = ceil(double(cmdParams.rSize) / double(cmdParams.taskSize));
@@ -230,7 +232,7 @@ int main(int argc, char **argv) {
     strcat(path, tmp);
 
     printf("[INFO] Initializing PCM Monitor...\n");
-    PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.corePausing, path, cmdParams.id);
+    PcmMonitor pcmMonitor(cmdParams.totalCores, 15, cmdParams.corePausing, path, cmdParams.id);
     if (cmdParams.programPMU) { pcmMonitor.setUpMonitoring(); }
 
     printf("[INFO] Initializing Hashtable...\n");
@@ -283,6 +285,7 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
                 {"r-size",          required_argument, 0, 'r'},
                 {"s-size",          required_argument, 0, 's'},
                 {"total-cores",     required_argument, 0, 'c'},
+                {"monitor-cores",   required_argument, 0, 'n'},
                 {"task-size",       required_argument, 0, 't'},
                 {"skew",            required_argument, 0, 'k'},
                 {"core-pausing",    required_argument, 0, 'p'},
@@ -318,6 +321,9 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
                 break;
             case 'c':
                 cmdParams->totalCores = atof(optarg);
+                break;
+            case 'n':
+                cmdParams->coresToMonitor = atof(optarg);
                 break;
             case 't':
                 cmdParams->taskSize = atof(optarg);

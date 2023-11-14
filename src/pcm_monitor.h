@@ -11,7 +11,7 @@ class PcmMonitor {
     bool firstCheckpointDone;
 
     public:
-        PcmMonitor(int totalCores_, bool corePausing_, char* path_, int id);
+        PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool corePausing_, char* path_, int id);
         ~PcmMonitor(void);
         void setUpMonitoring();
         void allowAllThreadsToContinue();
@@ -44,7 +44,7 @@ class PcmMonitor {
         int threadStrikes[15];
         bool threadStop[15];
         bool monitoring;
-        int totalCores;
+        int totalCoresUsed, totalCoresMonitored;
         bool corePausing;
         std::vector<std::thread> pcmThreads;
 };
