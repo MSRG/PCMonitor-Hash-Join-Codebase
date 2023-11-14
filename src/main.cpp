@@ -230,54 +230,93 @@ void hashjoin(HashJoinThreadArg * args) {
     if (programPMU) { pcmMonitor.setUpMonitoring(); }
 
     // This is where we check if hash table already exists.
-//    if (!globalht->built) { // Hash table is not built.
-//        if (!globalht->inCreation) { // No one is building it yet.
-//
-//            printf("[INFO] Creating Global Hashtable...\n");
-//            globalht->inCreation = true;
-//            uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
-//            allocate_hashtable(&globalht->ht, numBuckets);
-//
-//            printf("[INFO] Starting Monitoring...\n");
-//            if (programPMU) { pcmMonitor.startMonitorThread(); }
-//
-//            printf("[INFO] Initializing ThreadPool...\n");
-//            ThreadPool threadPool(totalCores, relR, relS, *globalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
-//
-//            threadPool.populateQueues();
-//            threadPool.start();
-//
-//            if (programPMU) {
-//                pcmMonitor.setMonitoringToFalse();
-//                pcmMonitor.stopMonitoring();
-//            }
-//        } else { // Create a new hash table just for this join.
+    if (!globalht->built) { // Hash table is not built.
+        if (!globalht->inCreation) { // No one is building it yet.
 
-            printf("[INFO] Global Hashtable not ready, making my own...\n");
-            GlobalHashTable ownGlobalht;
-            Hashtable * ht;
+            printf("[INFO] Creating Global Hashtable...\n");
+            globalht->inCreation = true;
             uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
-            allocate_hashtable(&ht, numBuckets);
-            ownGlobalht.ht = ht;
-            ownGlobalht.built = false;
-            ownGlobalht.inCreation = false;
+            allocate_hashtable(&globalht->ht, numBuckets);
 
             printf("[INFO] Starting Monitoring...\n");
             if (programPMU) { pcmMonitor.startMonitorThread(); }
 
             printf("[INFO] Initializing ThreadPool...\n");
-            ThreadPool threadPool(totalCores, relR, relS, ownGlobalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
+            ThreadPool threadPool(totalCores, relR, relS, *globalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
 
-            printf("[INFO] Populating Queues...\n");
             threadPool.populateQueues();
-
-            printf("[INFO] Start Hash Join...\n");
             threadPool.start();
 
             if (programPMU) {
                 pcmMonitor.setMonitoringToFalse();
                 pcmMonitor.stopMonitoring();
             }
+        } else if (globalht->inCreation) { // Someone is building the hash table! Wait for it to be built.
+            while (!globalht->built) {} // Loop until it is built.
+            std::cout << "[INFO] I am using the Global Hashtable..." << std::endl;
+            skipBuild = true;
+
+            printf("[INFO] Starting Monitoring...\n");
+            if (programPMU) { pcmMonitor.startMonitorThread(); }
+
+            printf("[INFO] Initializing ThreadPool...\n");
+            ThreadPool threadPool(totalCores, relR, relS, *globalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
+
+            threadPool.populateQueues();
+            threadPool.start();
+
+            if (programPMU) {
+                pcmMonitor.setMonitoringToFalse();
+                pcmMonitor.stopMonitoring();
+            }
+        }
+    } else {
+        std::cout << "[INFO] I am using the Global Hashtable..." << std::endl;
+        skipBuild = true;
+
+        printf("[INFO] Starting Monitoring...\n");
+        if (programPMU) { pcmMonitor.startMonitorThread(); }
+
+        printf("[INFO] Initializing ThreadPool...\n");
+        ThreadPool threadPool(totalCores, relR, relS, *globalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
+
+        threadPool.populateQueues();
+        threadPool.start();
+
+        if (programPMU) {
+            pcmMonitor.setMonitoringToFalse();
+            pcmMonitor.stopMonitoring();
+        }
+    }
+
+
+//        else { // Create a new hash table just for this join.
+//
+//            printf("[INFO] Global Hashtable not ready, making my own...\n");
+//            GlobalHashTable ownGlobalht;
+//            Hashtable * ht;
+//            uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+//            allocate_hashtable(&ht, numBuckets);
+//            ownGlobalht.ht = ht;
+//            ownGlobalht.built = false;
+//            ownGlobalht.inCreation = false;
+//
+//            printf("[INFO] Starting Monitoring...\n");
+//            if (programPMU) { pcmMonitor.startMonitorThread(); }
+//
+//            printf("[INFO] Initializing ThreadPool...\n");
+//            ThreadPool threadPool(totalCores, relR, relS, ownGlobalht, taskSize, buildQ, probeQ, pcmMonitor, path, id, skipBuild);
+//
+//            printf("[INFO] Populating Queues...\n");
+//            threadPool.populateQueues();
+//
+//            printf("[INFO] Start Hash Join...\n");
+//            threadPool.start();
+//
+//            if (programPMU) {
+//                pcmMonitor.setMonitoringToFalse();
+//                pcmMonitor.stopMonitoring();
+//            }
 //        }
 //    } else {
 //        std::cout << "[INFO] I am using the Global Hashtable..." << std::endl;
