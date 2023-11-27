@@ -301,38 +301,7 @@ void threaded_hash_join(HashJoinThreadArg * args) {
 
     printf("[INFO] Initializing PCM Monitor...\n");
     PcmMonitor pcmMonitor(totalCores, coresToMonitor, corePausing, path, id);
-
-    if (programPMU) {
-        pcmMonitor.setUpMonitoring();
-        pcmMonitor.setMonitoringToFalse();
-        pcmMonitor.stopMonitoring();
-    }
-
-    free(path);
-
-    return;
-
-
-    if (programPMU) {
-        pcmMonitor.setUpMonitoring();
-        pcmMonitor.setMonitoringToFalse();
-        pcmMonitor.stopMonitoring();
-    }
-    free(path);
-
-
-    free(relR.tuples);
-    free(relS.tuples);
-    free(path);
-//    free(globalHt);
-//    deallocate_hashtable(*globalHt->ht);
-
-    printf("[INFO] Initializing PCM Monitor...\n");
-    if (programPMU) { pcmMonitor.setUpMonitoring();
-    pcmMonitor.setMonitoringToFalse();
-    pcmMonitor.stopMonitoring();
-    }
-
+    if (programPMU) { pcmMonitor.setUpMonitoring(); }
 
     // -------------------- Share hash table -------------------------
     if (shareHt) {
@@ -433,16 +402,16 @@ void threaded_hash_join_copy(HashJoinThreadArg * args) {
 
     FineGrainedQueue buildQ(numOfBuildTasks);
     FineGrainedQueue probeQ(numOfProbeTasks);
-//
-//    fprintf(stdout,
-//            "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
-//            totalCores,
-//            taskSize,
-//            numOfBuildTasks,
-//            numOfProbeTasks,
-//            corePausing
-//            );
-//
+
+    fprintf(stdout,
+            "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
+            totalCores,
+            taskSize,
+            numOfBuildTasks,
+            numOfProbeTasks,
+            corePausing
+            );
+
 //    memRequired = ((double) sizeof(Tuple) * sSize) + ((double) sizeof(Tuple) * rSize) + ((rSize / BUCKET_SIZE) * sizeof(Bucket));
 //    memRequiredGB = memRequired/1000000000;
 //    memAvailable = 500 - getUsedMemoryCustom(); // 500 GB available.
@@ -484,32 +453,7 @@ void threaded_hash_join_copy(HashJoinThreadArg * args) {
 
     printf("[INFO] Initializing PCM Monitor...\n");
     PcmMonitor pcmMonitor(totalCores, coresToMonitor, corePausing, path, id);
-    if (programPMU) { pcmMonitor.setUpMonitoring();
-            pcmMonitor.setMonitoringToFalse();
-            pcmMonitor.stopMonitoring();
-    }
-
-//    free(path);
-
-    return;
-
-
-
-//    if (programPMU) {
-//        pcmMonitor.setUpMonitoring();
-//        pcmMonitor.setMonitoringToFalse();
-//        pcmMonitor.stopMonitoring();
-//    }
-//
-//    free(path);
-//
-//
-//    free(relR.tuples);
-//    free(relS.tuples);
-//    free(path);
-//    free(globalHt);
-//    deallocate_hashtable(*globalHt->ht);
-
+    if (programPMU) { pcmMonitor.setUpMonitoring();  }
 
     // -------------------- Share hash table -------------------------
 //    if (shareHt) {
@@ -604,15 +548,15 @@ int main(int argc, char **argv) {
     cmdParams.shareHt           = false;
     parse_args(argc, argv, &cmdParams);
 
-    usedMem = 0;
-    GlobalHashTable globalHashTable;
-    Hashtable ht;
-    globalHashTable.ht = &ht;
-    globalHashTable.ready = false;
-    globalHashTable.beingBuilt = false;
-
     // ************** THREAD-BASED HASH JOINS **************
     if (cmdParams.hjThreads > 0) {
+        usedMem = 0;
+        GlobalHashTable globalHashTable;
+        Hashtable ht;
+        globalHashTable.ht = &ht;
+        globalHashTable.ready = false;
+        globalHashTable.beingBuilt = false;
+
         std::vector<std::thread> threads(cmdParams.hjThreads);
         HashJoinThreadArg args[cmdParams.hjThreads];
         pthread_t tid[cmdParams.hjThreads];
@@ -637,10 +581,11 @@ int main(int argc, char **argv) {
             args[i].shareHt         = cmdParams.shareHt;
             args[i].tid             = i;
 
-            threads[i] = thread (threaded_hash_join_copy, &args[i]);
+            threads[i] = thread (threaded_hash_join, &args[i]);
         }
         for (auto& th : threads) { th.join(); }
 
+        std::cout << "Joined threads, done!" << std::endl;
         return 0;
 
     } else {  // ************** PROCESS-BASED HASH JOINS *************

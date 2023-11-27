@@ -40,8 +40,8 @@ PcmMonitor::PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool coreP
 
 //    std::cout << "TOTAL CORES TO MONITOR: " << totalCoresMonitored << std::endl;
 
-    this->path = new char[strlen(path_)+1];
-    strcpy(this->path, path_);
+    path = new char[strlen(path_)+1];
+    strcpy(path, path_);
 
     for (int i = 0; i < totalCoresMonitored; i++) {
         threadStop[i] = false;
@@ -59,21 +59,19 @@ PcmMonitor::PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool coreP
 
 PcmMonitor::~PcmMonitor(void) {
 //  std::cout << "PcmMonitor is being deleted" << std::endl;
-//   free(this->path);
+//   free(path);
+//    delete[] this->path;
 }
 
 void PcmMonitor::setUpMonitoring() {
-    std::cout << "setUpMonitoring" << std::endl;
+//    std::cout << "setUpMonitoring" << std::endl;
     uint32 core = 0;
     PCM * m = PCM::getInstance();
     PCM::ErrorCode status;
     pcmInstance = m;
 
-    std::cout << "0" << std::endl;
     if (pcmInstance->good()) {
-        std::cout << "1" << std::endl;
         status = pcmInstance->program(PCM::DEFAULT_EVENTS, MyEvents);
-        std::cout << "2" << std::endl;
         std::cout << "pcmInstance is good." << std::endl;
 
     } else {
@@ -81,7 +79,6 @@ void PcmMonitor::setUpMonitoring() {
         std::cout << "pcmInstance->good() FAILED:" << status << std::endl;
     }
 
-    std::cout << "ok" << std::endl;
      for (int i = 0; i < totalCoresMonitored; i++) {
         coreBeforeState[i] = getCoreCounterState(core);
         core++;

@@ -11,7 +11,7 @@ class PcmMonitor {
     bool firstCheckpointDone;
 
     public:
-        PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool corePausing_, char* path_, int id);
+        PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool corePausing_, char * path_, int id);
         ~PcmMonitor(void);
         void setUpMonitoring();
         void allowAllThreadsToContinue();
