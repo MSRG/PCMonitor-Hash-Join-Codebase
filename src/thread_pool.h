@@ -9,13 +9,13 @@
 
 #include "types.h"
 #include "pcm_monitor.h"
-//#include "safe_queue.h"
 #include "fine_grained_queue.h"
 
 class ThreadPool {
 
     public:
         Relation *relR, *relS;
+        GlobalHashTable *globalHt;
         Hashtable *ht;
         JoinResults *joinResults;
         FineGrainedQueue *buildQ;
@@ -25,7 +25,7 @@ class ThreadPool {
         int numThreads, taskSize;
 //        int currentTupIndex, phase;
         PcmMonitor *pcmMonitor;
-        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id);
+        ThreadPool(int numThreads, Relation &relR_, Relation &relS_, GlobalHashTable &hlobalht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id);
         void start();
         void saveTimingResults();
         void freeThreadsIfBuildQueueEmpty();

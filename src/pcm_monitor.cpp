@@ -61,14 +61,17 @@ PcmMonitor::~PcmMonitor(void) {
 }
 
 void PcmMonitor::setUpMonitoring() {
-
+    std::cout << "setUpMonitoring" << std::endl;
     uint32 core = 0;
     PCM * m = PCM::getInstance();
     PCM::ErrorCode status;
     pcmInstance = m;
 
+    std::cout << "0" << std::endl;
     if (pcmInstance->good()) {
+        std::cout << "1" << std::endl;
         status = pcmInstance->program(PCM::DEFAULT_EVENTS, MyEvents);
+        std::cout << "2" << std::endl;
         std::cout << "pcmInstance is good." << std::endl;
 
     } else {
@@ -76,6 +79,7 @@ void PcmMonitor::setUpMonitoring() {
         std::cout << "pcmInstance->good() FAILED:" << status << std::endl;
     }
 
+//    std::cout << "0" << std::endl;
      for (int i = 0; i < totalCoresMonitored; i++) {
         coreBeforeState[i] = getCoreCounterState(core);
         core++;
@@ -96,12 +100,12 @@ bool PcmMonitor::shouldThreadStop(int id) {
 }
 
 void PcmMonitor::makeStopDecisions() {
-    int maxStrikesTolerance = 10;
+    int maxStrikesTolerance = 5;
 
     // NOTE: core 0 is not allowed to stop.
     // HERE: set which cores are allowed to stop at all
 
-    for (int i = 1; i < 8; i++) {
+    for (int i = 1; i < 4; i++) {
         if (threadStrikes[i] > maxStrikesTolerance) {
             threadStop[i] = true;
         } else if (threadStrikes[i] <= 0) {
@@ -109,7 +113,6 @@ void PcmMonitor::makeStopDecisions() {
             cv[i].notify_one(); // in case it is waiting.
         }
     }
-
 
 //    if (id == 1) { // pause: use 15 for all.
 //         for (int i = 1; i < 8; i++) {
@@ -213,7 +216,7 @@ void PcmMonitor::runMonitoring() {
         checkpointPerformanceCounters();
         analyzeCacheStats();
         if (corePausing) { makeStopDecisions(); }
-        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        std::this_thread::sleep_for(std::chrono::milliseconds(4000));
     }
 //    memBandwidthFlag = false;
 //    saveMemoryBandwidthValues();

@@ -24,13 +24,14 @@ const char * THREAD_RESULTS_CSV = "individual-thread-results.csv";
 
 pthread_mutex_t results_lock;
 
-ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, Hashtable &ht_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id_) {
+ThreadPool::ThreadPool(int numThreads_, Relation &relR_, Relation &relS_, GlobalHashTable &globalHt_, int taskSize_, FineGrainedQueue &buildQ_, FineGrainedQueue &probeQ_, PcmMonitor &pcmMonitor_, char* path_, int id_) {
 
     // Assign constructor arguments to class members.
     numThreads = numThreads_;
     relR = &relR_;
     relS = &relS_;
-    ht = &ht_;
+    ht = globalHt_.ht;
+    globalHt = &globalHt_;
     taskSize = taskSize_;
     buildQ = &buildQ_;
     probeQ = &probeQ_;
@@ -198,21 +199,27 @@ void ThreadPool::run(ThreadArg * args) {
     init_bucket_buffer(&args->overflowBuf);
 
     if (args->tid == 0) {
-        std::cout << "saving startTime" << std::endl;
+//        std::cout << "saving startTime" << std::endl;
         gettimeofday(&(ts.startTime), NULL);
     }
 
-    while (checkThreadStatusDuringBuild(*args)) {
-        if (buildQ->dequeue(*(args->task), args->lastTaskVectorPosition)) {
-            (args->task->function)(*args);
-        } else { break; }
+    if (!args->globalHt->ready) { // Only build if it is not already ready.
+//        std::cout << "I AM IN THE BUILD PHASE" << std::endl;
+        while (checkThreadStatusDuringBuild(*args)) {
+            if (buildQ->dequeue(*(args->task), args->lastTaskVectorPosition)) {
+                (args->task->function)(*args);
+            } else { break; }
+        }
+        args->globalHt->ready = true;
+        args->globalHt->beingBuilt = false;
     }
+//    else { std::cout << "I GET TO SKIP THE BUILD PHASE HEHEHE: " << args->tid << std::endl; }
 
 //    freeThreadsIfBuildQueueEmpty();
     pthread_barrier_wait(args->barrier);
 
     if (args->tid == 0) {
-        std::cout << "saving buildPhaseEnd" << std::endl;
+//        std::cout << "saving buildPhaseEnd" << std::endl;
         gettimeofday(&(ts.buildPhaseEnd), NULL);
     }
 
@@ -278,6 +285,7 @@ void ThreadPool::start() {
         args[i].matchTasks = 0;
         args[i].lastTaskVectorPosition = -1;
         args[i].ht = ht;
+        args[i].globalHt = globalHt;
         args[i].relR = relR;
         args[i].relS = relS;
         args[i].taskSize = taskSize;

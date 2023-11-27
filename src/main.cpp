@@ -10,10 +10,10 @@
 #include <getopt.h>
 #include <cmath>
 #include <unistd.h>
+#include <mutex>
 
 #include "sys/types.h"
 #include "sys/sysinfo.h"
-
 
 // Files:
 #include "types.h"
@@ -23,7 +23,12 @@
 #include "relation_generator.h"
 //#include "safe_queue.h"
 #include "fine_grained_queue.h"
+//#include "global_hash_table.h"
 using namespace std;
+
+std::mutex globalHtMutex; // Global mutex for global hash table.
+std::mutex globalMemMutex; // Global mutex for global hash table.
+long long usedMem;
 
 /**
  * Data structure for command line arguments.
@@ -46,7 +51,34 @@ void print_help();
 
 void parse_args(int argc, char **argv, CmdParams * cmdParams);
 
-// Physical Memory currently used
+// ***********************************************************************************************************
+//                                   Physical Memory Used
+// ***********************************************************************************************************
+
+// in GB
+void updateUsedMemoryCustom(long long memUpdate) {
+    unique_lock<mutex> lock(globalMemMutex);
+    usedMem += memUpdate;
+    lock.unlock();
+}
+
+// in GB
+int getUsedMemoryCustom() {
+    return usedMem;
+}
+
+// in GB
+bool isMemAvailable(int memUpdate) {
+    unique_lock<mutex> lock(globalMemMutex);
+
+    if ((usedMem + memUpdate) > 500) { return false; }
+    else {
+        usedMem += memUpdate;
+        return true;
+    }
+    lock.unlock();
+}
+
 long long getUsedMemory(int id, int checkpoint) {
 
     struct sysinfo memInfo;
@@ -71,7 +103,6 @@ long long getUsedMemory(int id, int checkpoint) {
     return physMemUsed;
 }
 
-// Physical Memory currently used by current process
 
 int parseLine(char* line) {
     // This assumes that a digit will be found and the line ends in " Kb".
@@ -82,6 +113,7 @@ int parseLine(char* line) {
     i = atoi(p);
     return i;
 }
+
 
 int getValue(){ //Note: this value is in KB!
     FILE* file = fopen("/proc/self/status", "r");
@@ -98,7 +130,11 @@ int getValue(){ //Note: this value is in KB!
     return result;
 }
 
-// *** Create relations in parallel ** //
+
+// ***********************************************************************************************************
+//                                   Create relations in parallel
+// ***********************************************************************************************************
+
 void create_relations(Relation &relR, Relation &relS, uint64_t rSize, uint64_t sSize, int skew, int taskSize) {
 
     RelCreationThreadArg relThreadArgs[2];
@@ -151,14 +187,405 @@ void create_relations(Relation &relR, Relation &relS, uint64_t rSize, uint64_t s
        pthread_join(tid[i], NULL);
 }
 
-int main(int argc, char **argv) {
 
+// ***********************************************************************************************************
+//                                   Thread-based hash join
+// ***********************************************************************************************************
+
+void getGlobalHt(GlobalHashTable * globalHt, int numBuckets) {
+
+    unique_lock<mutex> lock(globalHtMutex);
+
+    // Hash table exists and is ready to use!
+    if (globalHt->ready) {
+//        cout << "GLOBAL HASH TABLE IS READY FOR ME!" << endl;
+        return;
+        }
+
+    // Not built, and no one is building it, so I will build it.
+    if (!globalHt->ready && !globalHt->beingBuilt) {
+//        cout << "I AM BUILDING THE GLOBAL HASH TABLE!" << endl;
+        globalHt->beingBuilt = true;
+        allocate_hashtable(&globalHt->ht, numBuckets);
+        return;
+    }
+
+    // Someone else is building the hash table, it is not ready.
+    if (globalHt->beingBuilt && !globalHt->ready) {
+
+        lock.unlock();
+
+        // Wait until the hash table is ready.
+        while (!globalHt->ready) {
+//            cout << "WAITING FOR GLOBAL HASH TABLE" << endl;
+        }
+        return;
+    }
+}
+
+
+void threaded_hash_join(HashJoinThreadArg * args) {
+
+    int id                      = args->tid;
+    uint64_t rSize              = args->rSize;
+    uint64_t sSize              = args->sSize;
+    uint64_t totalCores         = args->totalCores;
+    uint64_t taskSize           = args->taskSize;
+    uint64_t coresToMonitor     = args->coresToMonitor;
+    bool corePausing            = args->corePausing;
+    bool programPMU             = args->programPMU;
+    GlobalHashTable *globalHt   = args->globalht;
+    int skew                    = args->skew;
+    bool shareHt                = args->shareHt;
+
+    int memRequiredGB = 0;
+    bool skipBuild = false;
     long long usedMem, memRequired, memAvailable;
     double numOfBuildTasks, numOfProbeTasks;
     Relation relR;
     Relation relS;
 
-    /* Command line parameters */
+    numOfBuildTasks = ceil(double(rSize) / double(taskSize));
+    numOfProbeTasks = ceil(double(sSize) / double(taskSize));
+
+    FineGrainedQueue buildQ(numOfBuildTasks);
+    FineGrainedQueue probeQ(numOfProbeTasks);
+
+    fprintf(stdout,
+            "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
+            totalCores,
+            taskSize,
+            numOfBuildTasks,
+            numOfProbeTasks,
+            corePausing
+            );
+
+    memRequired = ((double) sizeof(Tuple) * sSize) + ((double) sizeof(Tuple) * rSize) + ((rSize / BUCKET_SIZE) * sizeof(Bucket));
+    memRequiredGB = memRequired/1000000000;
+    memAvailable = 500 - getUsedMemoryCustom(); // 500 GB available.
+    std::cout << "Required memory for this hash join = " << memRequiredGB << " GB." << std::endl;
+    std::cout << "Available memory for this hash join = " << memAvailable << " GB." << std::endl;
+
+#if MONITOR_MEMORY==1 // -------------------- MEMORY USE MONITORING -------------------------
+//    while ((400000000000 - getUsedMemory(id, 0)) < memRequired) { }
+    while (!isMemAvailable(memRequiredGB)) { }
+#endif  // ----------------------------------------------------------------------------------
+
+    create_relations(relR, relS, rSize, sSize, skew, taskSize);
+
+    // Create results path
+    char * path;
+    const char * resultsDir = "../results/";
+    // get datetime and convert to string.
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%d-%m-%Y-");
+//    oss << std::put_time(&tm, "%d-%m-%Y--%H:%M:%S--");
+    oss << id;
+    auto datetimeStr = oss.str();
+    const char * datetime = datetimeStr.c_str();
+    // put path together.
+    path = new char[strlen(resultsDir) + strlen(datetime) + 1];
+    strcpy(path, resultsDir);
+    strcat(path, datetime);
+    // make new directory named after datetime in results folder.
+    int check = mkdir(path, 0777);
+    if (check) { // check if directory is created or not
+        printf("Unable to create directory for saving results.\n");
+        exit(1);
+    }
+    // Update path to be used by other functions to save files.
+    const char * tmp = "/";
+    strcat(path, tmp);
+
+    printf("[INFO] Initializing PCM Monitor...\n");
+    PcmMonitor pcmMonitor(totalCores, coresToMonitor, corePausing, path, id);
+
+    if (programPMU) {
+        pcmMonitor.setUpMonitoring();
+        pcmMonitor.setMonitoringToFalse();
+        pcmMonitor.stopMonitoring();
+    }
+
+    free(path);
+
+    return;
+
+
+    if (programPMU) {
+        pcmMonitor.setUpMonitoring();
+        pcmMonitor.setMonitoringToFalse();
+        pcmMonitor.stopMonitoring();
+    }
+    free(path);
+
+
+    free(relR.tuples);
+    free(relS.tuples);
+    free(path);
+//    free(globalHt);
+//    deallocate_hashtable(*globalHt->ht);
+
+    printf("[INFO] Initializing PCM Monitor...\n");
+    if (programPMU) { pcmMonitor.setUpMonitoring();
+    pcmMonitor.setMonitoringToFalse();
+    pcmMonitor.stopMonitoring();
+    }
+
+
+    // -------------------- Share hash table -------------------------
+    if (shareHt) {
+        // Get the global hash table.
+        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+        getGlobalHt(globalHt, numBuckets);
+
+        printf("[INFO] Starting Monitoring...\n");
+        if (programPMU) { pcmMonitor.startMonitorThread(); }
+
+        printf("[INFO] Initializing ThreadPool...\n");
+        ThreadPool threadPool(totalCores, relR, relS, *globalHt, taskSize, buildQ, probeQ, pcmMonitor, path, id);
+
+        threadPool.populateQueues();
+        threadPool.start();
+
+        if (programPMU) {
+            pcmMonitor.setMonitoringToFalse();
+            pcmMonitor.stopMonitoring();
+        }
+
+        #if SAVE_RELATIONS_TO_FILE==1
+            threadPool.saveJoinedRelationToFile();
+        #endif
+
+        std::cout << "free stuff.." << std::endl;
+    //    free(relR.tuples);
+    //    free(relS.tuples);
+    //    free(path);
+    //    deallocate_hashtable(*globalht->ht);
+        std::cout << "DONE! BYE!" << std::endl;
+
+    // --------------- Each thread uses an individual hash table --------------------
+    } else {
+
+        GlobalHashTable privateHashTable;
+        Hashtable * ht;
+        privateHashTable.ht = ht;
+        privateHashTable.ready = false;
+        privateHashTable.beingBuilt = false;
+
+        privateHashTable.beingBuilt = true;
+        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+        allocate_hashtable(&privateHashTable.ht, numBuckets);
+
+        printf("[INFO] Starting Monitoring...\n");
+        if (programPMU) { pcmMonitor.startMonitorThread(); }
+
+        printf("[INFO] Initializing ThreadPool...\n");
+        ThreadPool threadPool(totalCores, relR, relS, privateHashTable, taskSize, buildQ, probeQ, pcmMonitor, path, id);
+
+        threadPool.populateQueues();
+        threadPool.start();
+
+        if (programPMU) {
+            pcmMonitor.setMonitoringToFalse();
+            pcmMonitor.stopMonitoring();
+        }
+
+        #if SAVE_RELATIONS_TO_FILE==1
+            threadPool.saveJoinedRelationToFile();
+        #endif
+
+        std::cout << "free stuff.." << std::endl;
+        //    free(relR.tuples);
+        //    free(relS.tuples);
+        //    free(path);
+        //    deallocate_hashtable(*globalht->ht);
+        std::cout << "DONE! BYE!" << std::endl;
+
+    }
+}
+
+
+void threaded_hash_join_copy(HashJoinThreadArg * args) {
+
+    int id                      = args->tid;
+    uint64_t rSize              = args->rSize;
+    uint64_t sSize              = args->sSize;
+    uint64_t totalCores         = args->totalCores;
+    uint64_t taskSize           = args->taskSize;
+    uint64_t coresToMonitor     = args->coresToMonitor;
+    bool corePausing            = args->corePausing;
+    bool programPMU             = args->programPMU;
+    GlobalHashTable *globalHt   = args->globalht;
+    int skew                    = args->skew;
+    bool shareHt                = args->shareHt;
+
+    int memRequiredGB = 0;
+    bool skipBuild = false;
+    long long usedMem, memRequired, memAvailable;
+    double numOfBuildTasks, numOfProbeTasks;
+    Relation relR;
+    Relation relS;
+
+    numOfBuildTasks = ceil(double(rSize) / double(taskSize));
+    numOfProbeTasks = ceil(double(sSize) / double(taskSize));
+
+    FineGrainedQueue buildQ(numOfBuildTasks);
+    FineGrainedQueue probeQ(numOfProbeTasks);
+
+    fprintf(stdout,
+            "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
+            totalCores,
+            taskSize,
+            numOfBuildTasks,
+            numOfProbeTasks,
+            corePausing
+            );
+
+    memRequired = ((double) sizeof(Tuple) * sSize) + ((double) sizeof(Tuple) * rSize) + ((rSize / BUCKET_SIZE) * sizeof(Bucket));
+    memRequiredGB = memRequired/1000000000;
+    memAvailable = 500 - getUsedMemoryCustom(); // 500 GB available.
+    std::cout << "Required memory for this hash join = " << memRequiredGB << " GB." << std::endl;
+    std::cout << "Available memory for this hash join = " << memAvailable << " GB." << std::endl;
+
+#if MONITOR_MEMORY==1 // -------------------- MEMORY USE MONITORING -------------------------
+//    while ((400000000000 - getUsedMemory(id, 0)) < memRequired) { }
+    while (!isMemAvailable(memRequiredGB)) { }
+#endif  // ----------------------------------------------------------------------------------
+
+    create_relations(relR, relS, rSize, sSize, skew, taskSize);
+
+    // Create results path
+    char * path;
+    const char * resultsDir = "../results/";
+    // get datetime and convert to string.
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%d-%m-%Y-");
+//    oss << std::put_time(&tm, "%d-%m-%Y--%H:%M:%S--");
+    oss << id;
+    auto datetimeStr = oss.str();
+    const char * datetime = datetimeStr.c_str();
+    // put path together.
+    path = new char[strlen(resultsDir) + strlen(datetime) + 1];
+    strcpy(path, resultsDir);
+    strcat(path, datetime);
+    // make new directory named after datetime in results folder.
+    int check = mkdir(path, 0777);
+    if (check) { // check if directory is created or not
+        printf("Unable to create directory for saving results.\n");
+        exit(1);
+    }
+    // Update path to be used by other functions to save files.
+    const char * tmp = "/";
+    strcat(path, tmp);
+
+    printf("[INFO] Initializing PCM Monitor...\n");
+    PcmMonitor pcmMonitor(totalCores, coresToMonitor, corePausing, path, id);
+
+//    free(path);
+
+    return;
+
+
+
+    if (programPMU) {
+        pcmMonitor.setUpMonitoring();
+        pcmMonitor.setMonitoringToFalse();
+        pcmMonitor.stopMonitoring();
+    }
+
+    free(path);
+
+
+    free(relR.tuples);
+    free(relS.tuples);
+    free(path);
+//    free(globalHt);
+//    deallocate_hashtable(*globalHt->ht);
+
+
+    // -------------------- Share hash table -------------------------
+    if (shareHt) {
+        // Get the global hash table.
+        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+        getGlobalHt(globalHt, numBuckets);
+
+        printf("[INFO] Starting Monitoring...\n");
+        if (programPMU) { pcmMonitor.startMonitorThread(); }
+
+        printf("[INFO] Initializing ThreadPool...\n");
+        ThreadPool threadPool(totalCores, relR, relS, *globalHt, taskSize, buildQ, probeQ, pcmMonitor, path, id);
+
+        threadPool.populateQueues();
+        threadPool.start();
+
+        if (programPMU) {
+            pcmMonitor.setMonitoringToFalse();
+            pcmMonitor.stopMonitoring();
+        }
+
+        #if SAVE_RELATIONS_TO_FILE==1
+            threadPool.saveJoinedRelationToFile();
+        #endif
+
+        std::cout << "free stuff.." << std::endl;
+    //    free(relR.tuples);
+    //    free(relS.tuples);
+    //    free(path);
+    //    deallocate_hashtable(*globalht->ht);
+        std::cout << "DONE! BYE!" << std::endl;
+
+    // --------------- Each thread uses an individual hash table --------------------
+    } else {
+
+        GlobalHashTable privateHashTable;
+        Hashtable * ht;
+        privateHashTable.ht = ht;
+        privateHashTable.ready = false;
+        privateHashTable.beingBuilt = false;
+
+        privateHashTable.beingBuilt = true;
+        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+        allocate_hashtable(&privateHashTable.ht, numBuckets);
+
+        printf("[INFO] Starting Monitoring...\n");
+        if (programPMU) { pcmMonitor.startMonitorThread(); }
+
+        printf("[INFO] Initializing ThreadPool...\n");
+        ThreadPool threadPool(totalCores, relR, relS, privateHashTable, taskSize, buildQ, probeQ, pcmMonitor, path, id);
+
+        threadPool.populateQueues();
+        threadPool.start();
+
+        if (programPMU) {
+            pcmMonitor.setMonitoringToFalse();
+            pcmMonitor.stopMonitoring();
+        }
+
+        #if SAVE_RELATIONS_TO_FILE==1
+            threadPool.saveJoinedRelationToFile();
+        #endif
+
+        std::cout << "free stuff.." << std::endl;
+        //    free(relR.tuples);
+        //    free(relS.tuples);
+        //    free(path);
+        //    deallocate_hashtable(*globalht->ht);
+        std::cout << "DONE! BYE!" << std::endl;
+
+    }
+}
+
+
+// ***********************************************************************************************************
+//                                                Main
+// ***********************************************************************************************************
+int main(int argc, char **argv) {
+
+  /* Command line parameters */
     CmdParams cmdParams;
     cmdParams.rSize             = 1000000;
     cmdParams.sSize             = 1000000;
@@ -169,104 +596,148 @@ int main(int argc, char **argv) {
     cmdParams.corePausing       = false;
     cmdParams.programPMU        = true;
     cmdParams.id                = 0;
-    cmdParams.hjThreads         = 1;
+    cmdParams.hjThreads         = 0;
     cmdParams.shareHt           = false;
     parse_args(argc, argv, &cmdParams);
 
-    numOfBuildTasks = ceil(double(cmdParams.rSize) / double(cmdParams.taskSize));
-    numOfProbeTasks = ceil(double(cmdParams.sSize) / double(cmdParams.taskSize));
-
-    FineGrainedQueue buildQ(numOfBuildTasks);
-    FineGrainedQueue probeQ(numOfProbeTasks);
-
-    fprintf(stdout,
-            "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
-            cmdParams.totalCores,
-            cmdParams.taskSize,
-            numOfBuildTasks,
-            numOfProbeTasks,
-            cmdParams.corePausing
-            );
-
-//    getUsedMemory(cmdParams.id, 0);
-
-    memRequired = ((double) sizeof(Tuple) * cmdParams.sSize) + ((double) sizeof(Tuple) * cmdParams.rSize) + ((cmdParams.rSize / BUCKET_SIZE) * sizeof(Bucket));
-    memAvailable = 500000000000 - getUsedMemory(cmdParams.id, 0);
-    std::cout << "Required memory for this hash join = " << memRequired/1000000000 << " GB." << std::endl;
-    std::cout << "Available memory for this hash join = " << memAvailable/1000000000 << " GB." << std::endl;
-
-
-// -------------------- MEMORY USE MONITORING -------------------------
-#if MONITOR_MEMORY==1
-    while ((400000000000 - getUsedMemory(cmdParams.id, 0)) < memRequired) { }
-#endif
-// --------------------------------------------------------------------
-
-    create_relations(relR, relS, cmdParams.rSize, cmdParams.sSize, cmdParams.skew, cmdParams.taskSize);
-//    getUsedMemory(cmdParams.id, 1);
-
-    char * path;
-    const char * resultsDir = "../results/";
-
-    // get datetime and convert to string.
-    auto t = std::time(nullptr);
-    auto tm = *std::localtime(&t);
-    std::ostringstream oss;
-    oss << std::put_time(&tm, "%d-%m-%Y--%H:%M:%S--");
-    oss << cmdParams.id;
-    auto datetimeStr = oss.str();
-    const char * datetime = datetimeStr.c_str();
-
-    // put path together.
-    path = new char[strlen(resultsDir) + strlen(datetime) + 1];
-    strcpy(path, resultsDir);
-    strcat(path, datetime);
-
-    // make new directory named after datetime in results folder.
-    int check = mkdir(path, 0777);
-    // check if directory is created or not
-    if (check) {
-        printf("Unable to create directory for saving results.\n");
-        exit(1);
-    }
-
-    // Update path to be used by other functions to save files.
-    const char * tmp = "/";
-    strcat(path, tmp);
-
-    printf("[INFO] Initializing PCM Monitor...\n");
-    PcmMonitor pcmMonitor(cmdParams.totalCores, 15, cmdParams.corePausing, path, cmdParams.id);
-    if (cmdParams.programPMU) { pcmMonitor.setUpMonitoring(); }
-
-    printf("[INFO] Initializing Hashtable...\n");
+    usedMem = 0;
+    GlobalHashTable globalHashTable;
     Hashtable * ht;
-    uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
-    allocate_hashtable(&ht, numBuckets);
+    globalHashTable.ht = ht;
+    globalHashTable.ready = false;
+    globalHashTable.beingBuilt = false;
 
-    printf("[INFO] Starting Monitoring...\n");
-    pcmMonitor.startMonitorThread();
+    // ************** THREAD-BASED HASH JOINS **************
+    if (cmdParams.hjThreads > 0) {
+        std::vector<std::thread> threads(cmdParams.hjThreads);
+        HashJoinThreadArg args[cmdParams.hjThreads];
+        pthread_t tid[cmdParams.hjThreads];
 
-    printf("[INFO] Initializing ThreadPool...\n");
-    ThreadPool threadPool(cmdParams.totalCores, relR, relS, *ht, cmdParams.taskSize, buildQ, probeQ, pcmMonitor, path, cmdParams.id);
-    threadPool.populateQueues();
-    threadPool.start();
+        cpu_set_t set;            // Linux struct representing set of CPUs.
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
 
-    pcmMonitor.setMonitoringToFalse();
-    pcmMonitor.stopMonitoring();
+        for (int i = 0; i < cmdParams.hjThreads; i++) {
+            CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
+            CPU_SET(i, &set);               // Add CPU cpu to set.
 
-#if SAVE_RELATIONS_TO_FILE==1
-    threadPool.saveJoinedRelationToFile();
-#endif
+            args[i].rSize           = cmdParams.rSize;
+            args[i].sSize           = cmdParams.sSize;
+            args[i].totalCores      = cmdParams.totalCores;
+            args[i].coresToMonitor  = cmdParams.coresToMonitor;
+            args[i].taskSize        = cmdParams.taskSize;
+            args[i].corePausing     = cmdParams.corePausing;
+            args[i].programPMU      = cmdParams.programPMU;
+            args[i].skew            = cmdParams.skew;
+            args[i].globalht        = &globalHashTable;
+            args[i].shareHt         = cmdParams.shareHt;
+            args[i].tid             = i;
 
-    std::cout << "free stuff.." << std::endl;
-    free(relR.tuples);
-    free(relS.tuples);
-    free(path);
-    deallocate_hashtable(*ht);
-    std::cout << "DONE! BYE!" << std::endl;
+            threads[i] = thread (threaded_hash_join_copy, &args[i]);
+        }
+        for (auto& th : threads) { th.join(); }
+
+        return 0;
+
+    } else {  // ************** PROCESS-BASED HASH JOINS *************
+
+        long long usedMem, memRequired, memAvailable;
+        double numOfBuildTasks, numOfProbeTasks;
+        Relation relR;
+        Relation relS;
+
+        numOfBuildTasks = ceil(double(cmdParams.rSize) / double(cmdParams.taskSize));
+        numOfProbeTasks = ceil(double(cmdParams.sSize) / double(cmdParams.taskSize));
+
+        FineGrainedQueue buildQ(numOfBuildTasks);
+        FineGrainedQueue probeQ(numOfProbeTasks);
+
+        fprintf(stdout,
+                "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
+                cmdParams.totalCores,
+                cmdParams.taskSize,
+                numOfBuildTasks,
+                numOfProbeTasks,
+                cmdParams.corePausing
+                );
+
+        memRequired = ((double) sizeof(Tuple) * cmdParams.sSize) + ((double) sizeof(Tuple) * cmdParams.rSize) + ((cmdParams.rSize / BUCKET_SIZE) * sizeof(Bucket));
+        memAvailable = 500000000000 - getUsedMemory(cmdParams.id, 0);
+        std::cout << "Required memory for this hash join = " << memRequired/1000000000 << " GB." << std::endl;
+        std::cout << "Available memory for this hash join = " << memAvailable/1000000000 << " GB." << std::endl;
+
+    #if MONITOR_MEMORY==1 // -------------------- MEMORY USE MONITORING ------------------------
+        while ((400000000000 - getUsedMemory(cmdParams.id, 0)) < memRequired) { }
+    #endif // -----------------------------------------------------------------------------------
+
+        create_relations(relR, relS, cmdParams.rSize, cmdParams.sSize, cmdParams.skew, cmdParams.taskSize);
+
+        // Create results path
+        char * path;
+        const char * resultsDir = "../results/";
+        // get datetime and convert to string.
+        auto t = std::time(nullptr);
+        auto tm = *std::localtime(&t);
+        std::ostringstream oss;
+//        oss << std::put_time(&tm, "%d-%m-%Y--%H:%M:%S--");
+        oss << std::put_time(&tm, "%d-%m-%Y--");
+        oss << cmdParams.id;
+        auto datetimeStr = oss.str();
+        const char * datetime = datetimeStr.c_str();
+        // put path together.
+        path = new char[strlen(resultsDir) + strlen(datetime) + 1];
+        strcpy(path, resultsDir);
+        strcat(path, datetime);
+        // make new directory named after datetime in results folder.
+        int check = mkdir(path, 0777);
+        // check if directory is created or not
+        if (check) {
+            printf("Unable to create directory for saving results.\n");
+            exit(1);
+        }
+        // Update path to be used by other functions to save files.
+        const char * tmp = "/";
+        strcat(path, tmp);
+
+        printf("[INFO] Initializing PCM Monitor...\n");
+        PcmMonitor pcmMonitor(cmdParams.totalCores, 15, cmdParams.corePausing, path, cmdParams.id);
+        if (cmdParams.programPMU) { pcmMonitor.setUpMonitoring(); }
+
+        printf("[INFO] Initializing Hashtable...\n");
+        Hashtable * individualHt;
+        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+        allocate_hashtable(&individualHt, numBuckets);
+
+        GlobalHashTable individualGlobalHt; // have to create one of these to pass into thread pool.
+        individualGlobalHt.ready = false;
+        individualGlobalHt.beingBuilt = false;
+        individualGlobalHt.ht = individualHt;
+
+        printf("[INFO] Starting Monitoring...\n");
+        pcmMonitor.startMonitorThread();
+
+        printf("[INFO] Initializing ThreadPool...\n");
+        ThreadPool threadPool(cmdParams.totalCores, relR, relS, individualGlobalHt, cmdParams.taskSize, buildQ, probeQ, pcmMonitor, path, cmdParams.id);
+        threadPool.populateQueues();
+        threadPool.start();
+
+        pcmMonitor.setMonitoringToFalse();
+        pcmMonitor.stopMonitoring();
+
+    #if SAVE_RELATIONS_TO_FILE==1
+        threadPool.saveJoinedRelationToFile();
+    #endif
+
+        std::cout << "free stuff.." << std::endl;
+//        free(relR.tuples);
+//        free(relS.tuples);
+//        free(path);
+//        deallocate_hashtable(*ht);
+        std::cout << "DONE! BYE!" << std::endl;
     return 0;
-}
 
+    }
+}
 
 void print_help(const char * progname) {
     printf("Usage: %s [options]\n", progname);

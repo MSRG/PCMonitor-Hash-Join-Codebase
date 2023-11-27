@@ -45,6 +45,8 @@ void write_relation(Relation *rel, char const * filename) {
     FILE * fp = fopen(filename, "w");
     uint64_t i;
 
+    std::cout << "Writing to file: " << filename << " " << rel->num_tuples << " tuples." << std::endl;
+
     fprintf(fp, "#KEY, VAL\n");
     for (i = 0; i < rel->num_tuples; i++) {
         fprintf(fp, "%li %li\n", rel->tuples[i].key, rel->tuples[i].payload);

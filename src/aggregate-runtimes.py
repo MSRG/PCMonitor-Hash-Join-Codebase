@@ -1,10 +1,6 @@
 import os
 import shutil
 
-# def copy_csv_contents(src_file, dest_file):
-#     with open(src_file, 'r') as src, open(dest_file, 'a') as dest:
-#         dest.write(src.read())
-
 def copy_second_line(src_file, dest_file):
     with open(src_file, 'r') as src, open(dest_file, 'a') as dest:
         second_line = src.readline().strip()
@@ -21,7 +17,7 @@ def parse_and_copy(directory_path, output_file):
 
 if __name__ == "__main__":
     source_directory = "../results"  # Change this to the path of your source directory
-    output_file_path = '../results-consolidated/consolidated-results.csv'  # Change this to the desired output file path
+    output_file_path = '../results-consolidated/consolidated-runtime.csv'  # Change this to the desired output file path
 
     parse_and_copy(source_directory, output_file_path)
     print(f"Contents of 'timing-results.csv' files in '{source_directory}' have been copied to '{output_file_path}'.")

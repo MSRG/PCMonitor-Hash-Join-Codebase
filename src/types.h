@@ -12,6 +12,7 @@
 #include <condition_variable>
 
 #include "config.h"
+//#include "global_hash_table.h"
 
 // Tuple keys & values are 64-bits (8 bytes) each —> 16 bytes per tuple.
 typedef         int64_t             intkey_t;
@@ -32,6 +33,8 @@ typedef struct QueueTask            QueueTask;
 
 typedef struct ChainedTupleBuffer   ChainedTupleBuffer;
 typedef struct TupleBuffer          TupleBuffer;
+
+typedef struct GlobalHashTable      GlobalHashTable;
 
 typedef struct FineGrainedLock      FineGrainedLock;
 
@@ -159,6 +162,7 @@ struct ThreadArg {
     uint64_t matchTasks;
     int lastTaskVectorPosition;
     Hashtable *ht;
+    GlobalHashTable *globalHt;
     Relation *relR;
     Relation *relS;
     QueueTask  *task;
@@ -175,6 +179,28 @@ struct QueueTask {
     uint64_t          startTupleIndex;
     uint64_t          endTupleIndex;
     funcky function;
+};
+
+/**************************** THREAD-BASED HASH JOIN ARGS ****************************/
+
+struct GlobalHashTable {
+    bool ready;
+    bool beingBuilt;
+    Hashtable * ht;
+};
+
+struct HashJoinThreadArg {
+    int tid;
+    uint64_t rSize;
+    uint64_t sSize;
+    uint64_t totalCores;
+    uint64_t coresToMonitor;
+    uint64_t taskSize;
+    bool corePausing;   // Allow cores to stop depending on performance counter info.
+    bool programPMU;    // Program the PMU.
+    int skew;
+    GlobalHashTable * globalht;
+    bool shareHt;
 };
 
 

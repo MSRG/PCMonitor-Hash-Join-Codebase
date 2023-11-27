@@ -53,7 +53,7 @@ void allocate_hashtable(Hashtable ** ppht, uint64_t nbuckets) {
     ht->num_buckets = nbuckets;
     NEXT_POW_2((ht->num_buckets));
 
-    std::cout << "Hash table info:\n-- Num of buckets = " << nbuckets << "\n-- Size = " << (ht->num_buckets * sizeof(Bucket))/1000000000 << " GB.\n" << std::endl; ;
+//    std::cout << "Hash table info:\n-- Num of buckets = " << nbuckets << "\n-- Size = " << (ht->num_buckets * sizeof(Bucket))/1000000000 << " GB.\n" << std::endl; ;
 
     // Allocate hashtable buckets cache line aligned.
     // Allocate (ht->num_buckets * sizeof(Bucket)) bytes and place the address of the allocated memory

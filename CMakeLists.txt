@@ -15,6 +15,8 @@ set_property(TARGET pcm PROPERTY IMPORTED_LOCATION "/home/sofia/Projects/CloudDB
 add_subdirectory(src)
 
 set(SOURCES
+        src/global_hash_table.h
+        src/global_hash_table.cpp
         src/safe_queue.h
         src/safe_queue.cpp
         src/fine_grained_queue.h
