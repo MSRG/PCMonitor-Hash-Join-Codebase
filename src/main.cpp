@@ -14,7 +14,6 @@
 #include "sys/types.h"
 #include "sys/sysinfo.h"
 
-
 // Files:
 #include "types.h"
 #include "config.h"
@@ -24,6 +23,9 @@
 //#include "safe_queue.h"
 #include "fine_grained_queue.h"
 using namespace std;
+
+std::mutex globalMemMutex; // Global mutex for global hash table.
+int usedMem, availbleMem;
 
 /**
  * Data structure for command line arguments.
@@ -43,6 +45,35 @@ struct CmdParams {
 void print_help();
 
 void parse_args(int argc, char **argv, CmdParams * cmdParams);
+
+// in GB
+void updateUsedMemoryCustom(long long memUpdate) {
+    unique_lock<mutex> lock(globalMemMutex);
+    usedMem += memUpdate;
+    lock.unlock();
+}
+
+// in GB
+int getUsedMemoryCustom() {
+    return usedMem;
+}
+
+// in GB
+int getAvailableMemoryCustom() {
+    return availbleMem;
+}
+
+// in GB
+bool isMemAvailable(int memUpdate) {
+    unique_lock<mutex> lock(globalMemMutex);
+
+    if ((usedMem + memUpdate) > memAvailable) { return false; }
+    else {
+        usedMem += memUpdate;
+        return true;
+    }
+    lock.unlock();
+}
 
 // Physical Memory currently used
 long long getUsedMemory(int id, int checkpoint) {
@@ -161,8 +192,9 @@ void hashjoin(HashJoinThreadArg * args) {
     GlobalHashTable *globalht   = args->globalht;
     int skew                    = args->skew;
 
+    int memRequiredGB, memAvailable;
     bool skipBuild = false;
-    long long usedMem, memRequired, memAvailable;
+    long long usedMem, memRequired;
     double numOfBuildTasks, numOfProbeTasks;
     Relation relR;
     Relation relS;
@@ -185,13 +217,15 @@ void hashjoin(HashJoinThreadArg * args) {
 //    getUsedMemory(cmdParams.id, 0);
 
     memRequired = ((double) sizeof(Tuple) * sSize) + ((double) sizeof(Tuple) * rSize) + ((rSize / BUCKET_SIZE) * sizeof(Bucket));
-    memAvailable = 500000000000 - getUsedMemory(id, 0);
-    std::cout << "Required memory for this hash join = " << memRequired/1000000000 << " GB." << std::endl;
-    std::cout << "Available memory for this hash join = " << memAvailable/1000000000 << " GB." << std::endl;
+    memRequiredGB = memRequired/1000000000;
+    memAvailable = getAvailableMemoryCustom();
+//    memAvailable = 500000000000 - getUsedMemory(id, 0);
+    std::cout << "Required memory for this hash join = " << memRequiredGB << " GB." << std::endl;
+    std::cout << "Available memory for this hash join = " << memAvailable << " GB." << std::endl;
 
 #if MONITOR_MEMORY==1
     // -------------------- MEMORY USE MONITORING -------------------------
-    while ((400000000000 - getUsedMemory(id, 0)) < memRequired) { }
+    while (!isMemAvailable(memRequired)) { }
     // --------------------------------------------------------------------
 #endif
 
@@ -364,6 +398,8 @@ int main(int argc, char **argv) {
     cmdParams.hashJoinThreads   = 1;
     parse_args(argc, argv, &cmdParams);
 
+    usedMem = 0;
+    availbleMem = 500;
     bool threadSleep = true;
 
     // creating threads for multiple hash joins
