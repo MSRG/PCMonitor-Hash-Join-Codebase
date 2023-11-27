@@ -602,8 +602,8 @@ int main(int argc, char **argv) {
 
     usedMem = 0;
     GlobalHashTable globalHashTable;
-    Hashtable * ht;
-    globalHashTable.ht = ht;
+    Hashtable ht;
+    globalHashTable.ht = &ht;
     globalHashTable.ready = false;
     globalHashTable.beingBuilt = false;
 

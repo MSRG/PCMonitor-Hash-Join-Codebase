@@ -14,7 +14,7 @@ cd build
 # --core-pausing: [bool] is core pausing enabled.
 # --program-pmu: [bool] should PMU be programmed and used (i.e. monitoring).
 
-sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=20000000 --s-size=20000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=1 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=0
+sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=20000000 --s-size=20000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=1 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
 
 # MEMORY SIZE EXPERIMENTS
 # 32 GB -- previous default max
