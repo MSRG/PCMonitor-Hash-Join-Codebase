@@ -38,6 +38,8 @@ PcmMonitor::PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool coreP
     firstCheckpointDone = false;
     id = id_;
 
+//    std::cout << "TOTAL CORES TO MONITOR: " << totalCoresMonitored << std::endl;
+
     this->path = new char[strlen(path_)+1];
     strcpy(this->path, path_);
 
@@ -57,7 +59,7 @@ PcmMonitor::PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool coreP
 
 PcmMonitor::~PcmMonitor(void) {
 //  std::cout << "PcmMonitor is being deleted" << std::endl;
-   free(this->path);
+//   free(this->path);
 }
 
 void PcmMonitor::setUpMonitoring() {
@@ -79,7 +81,7 @@ void PcmMonitor::setUpMonitoring() {
         std::cout << "pcmInstance->good() FAILED:" << status << std::endl;
     }
 
-//    std::cout << "0" << std::endl;
+    std::cout << "ok" << std::endl;
      for (int i = 0; i < totalCoresMonitored; i++) {
         coreBeforeState[i] = getCoreCounterState(core);
         core++;

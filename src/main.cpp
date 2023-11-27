@@ -433,26 +433,26 @@ void threaded_hash_join_copy(HashJoinThreadArg * args) {
 
     FineGrainedQueue buildQ(numOfBuildTasks);
     FineGrainedQueue probeQ(numOfProbeTasks);
-
-    fprintf(stdout,
-            "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
-            totalCores,
-            taskSize,
-            numOfBuildTasks,
-            numOfProbeTasks,
-            corePausing
-            );
-
-    memRequired = ((double) sizeof(Tuple) * sSize) + ((double) sizeof(Tuple) * rSize) + ((rSize / BUCKET_SIZE) * sizeof(Bucket));
-    memRequiredGB = memRequired/1000000000;
-    memAvailable = 500 - getUsedMemoryCustom(); // 500 GB available.
-    std::cout << "Required memory for this hash join = " << memRequiredGB << " GB." << std::endl;
-    std::cout << "Available memory for this hash join = " << memAvailable << " GB." << std::endl;
-
-#if MONITOR_MEMORY==1 // -------------------- MEMORY USE MONITORING -------------------------
-//    while ((400000000000 - getUsedMemory(id, 0)) < memRequired) { }
-    while (!isMemAvailable(memRequiredGB)) { }
-#endif  // ----------------------------------------------------------------------------------
+//
+//    fprintf(stdout,
+//            "\n[INFO] %lu cores being monitored:\n-- Task size = %lu,\n-- Number of build tasks = %f,\n-- Number of probe tasks = %f,\n-- corePausing = %i.\n",
+//            totalCores,
+//            taskSize,
+//            numOfBuildTasks,
+//            numOfProbeTasks,
+//            corePausing
+//            );
+//
+//    memRequired = ((double) sizeof(Tuple) * sSize) + ((double) sizeof(Tuple) * rSize) + ((rSize / BUCKET_SIZE) * sizeof(Bucket));
+//    memRequiredGB = memRequired/1000000000;
+//    memAvailable = 500 - getUsedMemoryCustom(); // 500 GB available.
+//    std::cout << "Required memory for this hash join = " << memRequiredGB << " GB." << std::endl;
+//    std::cout << "Available memory for this hash join = " << memAvailable << " GB." << std::endl;
+//
+//#if MONITOR_MEMORY==1 // -------------------- MEMORY USE MONITORING -------------------------
+////    while ((400000000000 - getUsedMemory(id, 0)) < memRequired) { }
+//    while (!isMemAvailable(memRequiredGB)) { }
+//#endif  // ----------------------------------------------------------------------------------
 
     create_relations(relR, relS, rSize, sSize, skew, taskSize);
 
@@ -484,6 +484,10 @@ void threaded_hash_join_copy(HashJoinThreadArg * args) {
 
     printf("[INFO] Initializing PCM Monitor...\n");
     PcmMonitor pcmMonitor(totalCores, coresToMonitor, corePausing, path, id);
+    if (programPMU) { pcmMonitor.setUpMonitoring();
+            pcmMonitor.setMonitoringToFalse();
+            pcmMonitor.stopMonitoring();
+    }
 
 //    free(path);
 
@@ -491,92 +495,92 @@ void threaded_hash_join_copy(HashJoinThreadArg * args) {
 
 
 
-    if (programPMU) {
-        pcmMonitor.setUpMonitoring();
-        pcmMonitor.setMonitoringToFalse();
-        pcmMonitor.stopMonitoring();
-    }
-
-    free(path);
-
-
-    free(relR.tuples);
-    free(relS.tuples);
-    free(path);
+//    if (programPMU) {
+//        pcmMonitor.setUpMonitoring();
+//        pcmMonitor.setMonitoringToFalse();
+//        pcmMonitor.stopMonitoring();
+//    }
+//
+//    free(path);
+//
+//
+//    free(relR.tuples);
+//    free(relS.tuples);
+//    free(path);
 //    free(globalHt);
 //    deallocate_hashtable(*globalHt->ht);
 
 
     // -------------------- Share hash table -------------------------
-    if (shareHt) {
-        // Get the global hash table.
-        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
-        getGlobalHt(globalHt, numBuckets);
-
-        printf("[INFO] Starting Monitoring...\n");
-        if (programPMU) { pcmMonitor.startMonitorThread(); }
-
-        printf("[INFO] Initializing ThreadPool...\n");
-        ThreadPool threadPool(totalCores, relR, relS, *globalHt, taskSize, buildQ, probeQ, pcmMonitor, path, id);
-
-        threadPool.populateQueues();
-        threadPool.start();
-
-        if (programPMU) {
-            pcmMonitor.setMonitoringToFalse();
-            pcmMonitor.stopMonitoring();
-        }
-
-        #if SAVE_RELATIONS_TO_FILE==1
-            threadPool.saveJoinedRelationToFile();
-        #endif
-
-        std::cout << "free stuff.." << std::endl;
-    //    free(relR.tuples);
-    //    free(relS.tuples);
-    //    free(path);
-    //    deallocate_hashtable(*globalht->ht);
-        std::cout << "DONE! BYE!" << std::endl;
-
-    // --------------- Each thread uses an individual hash table --------------------
-    } else {
-
-        GlobalHashTable privateHashTable;
-        Hashtable * ht;
-        privateHashTable.ht = ht;
-        privateHashTable.ready = false;
-        privateHashTable.beingBuilt = false;
-
-        privateHashTable.beingBuilt = true;
-        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
-        allocate_hashtable(&privateHashTable.ht, numBuckets);
-
-        printf("[INFO] Starting Monitoring...\n");
-        if (programPMU) { pcmMonitor.startMonitorThread(); }
-
-        printf("[INFO] Initializing ThreadPool...\n");
-        ThreadPool threadPool(totalCores, relR, relS, privateHashTable, taskSize, buildQ, probeQ, pcmMonitor, path, id);
-
-        threadPool.populateQueues();
-        threadPool.start();
-
-        if (programPMU) {
-            pcmMonitor.setMonitoringToFalse();
-            pcmMonitor.stopMonitoring();
-        }
-
-        #if SAVE_RELATIONS_TO_FILE==1
-            threadPool.saveJoinedRelationToFile();
-        #endif
-
-        std::cout << "free stuff.." << std::endl;
-        //    free(relR.tuples);
-        //    free(relS.tuples);
-        //    free(path);
-        //    deallocate_hashtable(*globalht->ht);
-        std::cout << "DONE! BYE!" << std::endl;
-
-    }
+//    if (shareHt) {
+//        // Get the global hash table.
+//        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+//        getGlobalHt(globalHt, numBuckets);
+//
+//        printf("[INFO] Starting Monitoring...\n");
+//        if (programPMU) { pcmMonitor.startMonitorThread(); }
+//
+//        printf("[INFO] Initializing ThreadPool...\n");
+//        ThreadPool threadPool(totalCores, relR, relS, *globalHt, taskSize, buildQ, probeQ, pcmMonitor, path, id);
+//
+//        threadPool.populateQueues();
+//        threadPool.start();
+//
+//        if (programPMU) {
+//            pcmMonitor.setMonitoringToFalse();
+//            pcmMonitor.stopMonitoring();
+//        }
+//
+//        #if SAVE_RELATIONS_TO_FILE==1
+//            threadPool.saveJoinedRelationToFile();
+//        #endif
+//
+//        std::cout << "free stuff.." << std::endl;
+//    //    free(relR.tuples);
+//    //    free(relS.tuples);
+//    //    free(path);
+//    //    deallocate_hashtable(*globalht->ht);
+//        std::cout << "DONE! BYE!" << std::endl;
+//
+//    // --------------- Each thread uses an individual hash table --------------------
+//    } else {
+//
+//        GlobalHashTable privateHashTable;
+//        Hashtable * ht;
+//        privateHashTable.ht = ht;
+//        privateHashTable.ready = false;
+//        privateHashTable.beingBuilt = false;
+//
+//        privateHashTable.beingBuilt = true;
+//        uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
+//        allocate_hashtable(&privateHashTable.ht, numBuckets);
+//
+//        printf("[INFO] Starting Monitoring...\n");
+//        if (programPMU) { pcmMonitor.startMonitorThread(); }
+//
+//        printf("[INFO] Initializing ThreadPool...\n");
+//        ThreadPool threadPool(totalCores, relR, relS, privateHashTable, taskSize, buildQ, probeQ, pcmMonitor, path, id);
+//
+//        threadPool.populateQueues();
+//        threadPool.start();
+//
+//        if (programPMU) {
+//            pcmMonitor.setMonitoringToFalse();
+//            pcmMonitor.stopMonitoring();
+//        }
+//
+//        #if SAVE_RELATIONS_TO_FILE==1
+//            threadPool.saveJoinedRelationToFile();
+//        #endif
+//
+//        std::cout << "free stuff.." << std::endl;
+//        //    free(relR.tuples);
+//        //    free(relS.tuples);
+//        //    free(path);
+//        //    deallocate_hashtable(*globalht->ht);
+//        std::cout << "DONE! BYE!" << std::endl;
+//
+//    }
 }
 
 
