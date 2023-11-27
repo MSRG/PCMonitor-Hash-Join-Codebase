@@ -6,7 +6,7 @@ cd build
 #    sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=100000000 --s-size=100000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1 --hj-threads=6
 #done
 
-sudo ./Pool-HashJoin-PCM --id=0 --r-size=1000000000 --s-size=1000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1 --hj-threads=1
+sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=4 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=0 --hj-threads=5
 
 #sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1
 

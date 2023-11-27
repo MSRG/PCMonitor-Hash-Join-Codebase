@@ -25,7 +25,7 @@
 using namespace std;
 
 std::mutex globalMemMutex; // Global mutex for global hash table.
-int usedMem, availbleMem;
+int usedMem, availableMem;
 
 /**
  * Data structure for command line arguments.
@@ -60,14 +60,14 @@ int getUsedMemoryCustom() {
 
 // in GB
 int getAvailableMemoryCustom() {
-    return availbleMem;
+    return availableMem;
 }
 
 // in GB
 bool isMemAvailable(int memUpdate) {
     unique_lock<mutex> lock(globalMemMutex);
 
-    if ((usedMem + memUpdate) > memAvailable) { return false; }
+    if ((usedMem + memUpdate) > availableMem) { return false; }
     else {
         usedMem += memUpdate;
         return true;
@@ -399,7 +399,7 @@ int main(int argc, char **argv) {
     parse_args(argc, argv, &cmdParams);
 
     usedMem = 0;
-    availbleMem = 500;
+    availableMem = 500;
     bool threadSleep = true;
 
     // creating threads for multiple hash joins
