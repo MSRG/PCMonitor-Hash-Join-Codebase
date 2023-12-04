@@ -299,9 +299,13 @@ void threaded_hash_join(HashJoinThreadArg * args) {
     const char * tmp = "/";
     strcat(path, tmp);
 
+
     printf("[INFO] Initializing PCM Monitor...\n");
     PcmMonitor pcmMonitor(totalCores, coresToMonitor, corePausing, path, id);
-    if (programPMU) { pcmMonitor.setUpMonitoring(); }
+
+#if USE_PCM==1
+    pcmMonitor.setUpMonitoring();
+#endif
 
     // -------------------- Share hash table -------------------------
     if (shareHt) {
@@ -318,14 +322,14 @@ void threaded_hash_join(HashJoinThreadArg * args) {
         threadPool.populateQueues();
         threadPool.start();
 
-        if (programPMU) {
-            pcmMonitor.setMonitoringToFalse();
-            pcmMonitor.stopMonitoring();
-        }
+#if USE_PCM==1
+        pcmMonitor.setMonitoringToFalse();
+        pcmMonitor.stopMonitoring();
+#endif
 
-        #if SAVE_RELATIONS_TO_FILE==1
+#if SAVE_RELATIONS_TO_FILE==1
             threadPool.saveJoinedRelationToFile();
-        #endif
+#endif
 
         std::cout << "free stuff.." << std::endl;
     //    free(relR.tuples);
@@ -347,8 +351,10 @@ void threaded_hash_join(HashJoinThreadArg * args) {
         uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
         allocate_hashtable(&privateHashTable.ht, numBuckets);
 
+#if USE_PCM==1
         printf("[INFO] Starting Monitoring...\n");
-        if (programPMU) { pcmMonitor.startMonitorThread(); }
+        pcmMonitor.startMonitorThread();
+#endif
 
         printf("[INFO] Initializing ThreadPool...\n");
         ThreadPool threadPool(totalCores, relR, relS, privateHashTable, taskSize, buildQ, probeQ, pcmMonitor, path, id);
@@ -356,14 +362,14 @@ void threaded_hash_join(HashJoinThreadArg * args) {
         threadPool.populateQueues();
         threadPool.start();
 
-        if (programPMU) {
-            pcmMonitor.setMonitoringToFalse();
-            pcmMonitor.stopMonitoring();
-        }
+#if USE_PCM==1
+        pcmMonitor.setMonitoringToFalse();
+        pcmMonitor.stopMonitoring();
+#endif
 
-        #if SAVE_RELATIONS_TO_FILE==1
-            threadPool.saveJoinedRelationToFile();
-        #endif
+#if SAVE_RELATIONS_TO_FILE==1
+        threadPool.saveJoinedRelationToFile();
+#endif
 
         std::cout << "free stuff.." << std::endl;
         //    free(relR.tuples);
@@ -453,7 +459,9 @@ void threaded_hash_join_copy(HashJoinThreadArg * args) {
 
     printf("[INFO] Initializing PCM Monitor...\n");
     PcmMonitor pcmMonitor(totalCores, coresToMonitor, corePausing, path, id);
-    if (programPMU) { pcmMonitor.setUpMonitoring();  }
+#if USE_PCM==1
+    pcmMonitor.setUpMonitoring();
+#endif
 
     // -------------------- Share hash table -------------------------
 //    if (shareHt) {
@@ -548,7 +556,7 @@ int main(int argc, char **argv) {
     cmdParams.shareHt           = false;
     parse_args(argc, argv, &cmdParams);
 
-    // ************** THREAD-BASED HASH JOINS **************
+    // **************************** THREAD-BASED HASH JOINS ************************************************************
     if (cmdParams.hjThreads > 0) {
         usedMem = 0;
         GlobalHashTable globalHashTable;
@@ -588,7 +596,7 @@ int main(int argc, char **argv) {
         std::cout << "Joined threads, done!" << std::endl;
         return 0;
 
-    } else {  // ************** PROCESS-BASED HASH JOINS *************
+    } else {  // **************************** PROCESS-BASED HASH JOINS *************************************************
 
         long long usedMem, memRequired, memAvailable;
         double numOfBuildTasks, numOfProbeTasks;
@@ -615,9 +623,9 @@ int main(int argc, char **argv) {
         std::cout << "Required memory for this hash join = " << memRequired/1000000000 << " GB." << std::endl;
         std::cout << "Available memory for this hash join = " << memAvailable/1000000000 << " GB." << std::endl;
 
-    #if MONITOR_MEMORY==1 // -------------------- MEMORY USE MONITORING ------------------------
+#if MONITOR_MEMORY==1 // -------------------- MEMORY USE MONITORING ------------------------
         while ((400000000000 - getUsedMemory(cmdParams.id, 0)) < memRequired) { }
-    #endif // -----------------------------------------------------------------------------------
+#endif // -----------------------------------------------------------------------------------
 
         create_relations(relR, relS, cmdParams.rSize, cmdParams.sSize, cmdParams.skew, cmdParams.taskSize);
 
@@ -648,9 +656,12 @@ int main(int argc, char **argv) {
         const char * tmp = "/";
         strcat(path, tmp);
 
+PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.coresToMonitor, cmdParams.corePausing, path, cmdParams.id);
+
+#if USE_PCM==1
         printf("[INFO] Initializing PCM Monitor...\n");
-        PcmMonitor pcmMonitor(cmdParams.totalCores, 15, cmdParams.corePausing, path, cmdParams.id);
-        if (cmdParams.programPMU) { pcmMonitor.setUpMonitoring(); }
+        pcmMonitor.setUpMonitoring();
+#endif
 
         printf("[INFO] Initializing Hashtable...\n");
         Hashtable * individualHt;
@@ -662,20 +673,24 @@ int main(int argc, char **argv) {
         individualGlobalHt.beingBuilt = false;
         individualGlobalHt.ht = individualHt;
 
+#if USE_PCM==1
         printf("[INFO] Starting Monitoring...\n");
         pcmMonitor.startMonitorThread();
+#endif
 
         printf("[INFO] Initializing ThreadPool...\n");
         ThreadPool threadPool(cmdParams.totalCores, relR, relS, individualGlobalHt, cmdParams.taskSize, buildQ, probeQ, pcmMonitor, path, cmdParams.id);
         threadPool.populateQueues();
         threadPool.start();
 
+#if USE_PCM==1
         pcmMonitor.setMonitoringToFalse();
         pcmMonitor.stopMonitoring();
+#endif
 
-    #if SAVE_RELATIONS_TO_FILE==1
+#if SAVE_RELATIONS_TO_FILE==1
         threadPool.saveJoinedRelationToFile();
-    #endif
+#endif
 
         std::cout << "free stuff.." << std::endl;
 //        free(relR.tuples);

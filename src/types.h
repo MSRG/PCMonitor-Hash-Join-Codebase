@@ -38,6 +38,8 @@ typedef struct GlobalHashTable      GlobalHashTable;
 
 typedef struct FineGrainedLock      FineGrainedLock;
 
+typedef struct Timestamps           Timestamps;
+
 
 using namespace std::chrono;
 
@@ -137,8 +139,11 @@ struct ChainedTupleBuffer {
     uint32_t numbufs;
 };
 
-
 /**************************** THREAD POOL STRUCTS ****************************/
+
+struct Timestamps {
+    struct timeval startTime, buildPhaseEnd, endTime;
+};
 
 struct RelCreationThreadArg {
     uint64_t relSize;
@@ -171,6 +176,7 @@ struct ThreadArg {
     JoinResults *threadJoinResults;
     ThreadResult *threadResults; // Results of the thread.
     std::condition_variable condVar;
+    Timestamps tsThread;
 };
 
 typedef void (*funcky)(ThreadArg&);
@@ -202,15 +208,6 @@ struct HashJoinThreadArg {
     GlobalHashTable * globalht;
     bool shareHt;
 };
-
-
-/**************************** THREAD POOL STRUCTS ****************************/
-
-
-struct Timestamps {
-    struct timeval startTime, buildPhaseEnd, endTime;
-};
-
 
 /**************************** TASK QUEUE STRUCTS ****************************/
 

@@ -48,6 +48,8 @@ PcmMonitor::PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool coreP
         threadStrikes[i] = 0;
         l2CacheStats[i].first = 0;
         l2CacheStats[i].second = 0;
+        l3CacheStats[i].first = 0;
+        l3CacheStats[i].second = 0;
         ipcStats[i].first = 0;
         ipcStats[i].second = 0;
         lmbStats[i].first = 0;
@@ -215,7 +217,7 @@ void PcmMonitor::runMonitoring() {
         checkpointPerformanceCounters();
         analyzeCacheStats();
         if (corePausing) { makeStopDecisions(); }
-        std::this_thread::sleep_for(std::chrono::milliseconds(4000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 //    memBandwidthFlag = false;
 //    saveMemoryBandwidthValues();

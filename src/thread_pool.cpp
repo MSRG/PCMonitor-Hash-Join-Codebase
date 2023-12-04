@@ -122,6 +122,24 @@ void ThreadPool::saveTimingResults() {
     file << "\n";
 }
 
+
+void ThreadPool::saveIndividualThreadTime(Timestamps &tsThread, int idThread) {
+    // Micro Seconds
+    double totalDiffUsec = ((tsThread.endTime).tv_sec*1000000L + (tsThread.endTime).tv_usec) - ((tsThread.startTime).tv_sec*1000000L+(tsThread.startTime).tv_usec);
+    // Seconds
+    double totalDiffSec = totalDiffUsec * 0.000001;
+    // Minutes
+    double totalDiffMin = totalDiffSec/60;
+
+//    std::cout << "saving individual thread timing! " << totalDiffSec << "  " << idThread << std::endl;
+
+    std::string path = "../individual-thread-timing/thread-" + std::to_string(idThread);
+
+    std::ofstream file(path, std::ios_base::app);
+    file << totalDiffSec;
+}
+
+
 void ThreadPool::saveIndividualThreadResults(ThreadArg &args) {
     pthread_mutex_lock(&results_lock);
 
@@ -203,6 +221,11 @@ void ThreadPool::run(ThreadArg * args) {
         gettimeofday(&(ts.startTime), NULL);
     }
 
+#if SAVE_INDIVIDUAL_THREAD_TIME==1
+    // Save individual thread's timestamp.
+    gettimeofday(&(args->tsThread.startTime), NULL);
+#endif
+
     if (!args->globalHt->ready) { // Only build if it is not already ready.
 //        std::cout << "I AM IN THE BUILD PHASE" << std::endl;
         while (checkThreadStatusDuringBuild(*args)) {
@@ -243,6 +266,12 @@ void ThreadPool::run(ThreadArg * args) {
         std::cout << "saving endTime" << std::endl;
         gettimeofday(&(ts.endTime), NULL);
     }
+
+#if SAVE_INDIVIDUAL_THREAD_TIME==1
+    // Save individual thread's timestamp.
+    gettimeofday(&(args->tsThread.endTime), NULL);
+    saveIndividualThreadTime(args->tsThread, args->tid);
+#endif
 
     args->nonMatchTasks = (args->completedTasks - args->matchTasks);
     saveIndividualThreadResults(*args);

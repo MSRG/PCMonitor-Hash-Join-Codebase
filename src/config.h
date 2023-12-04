@@ -5,10 +5,14 @@
 #ifndef POOL_HASHJOIN_PCM_CONFIG_H
 #define POOL_HASHJOIN_PCM_CONFIG_H
 
-#define MONITOR_MEMORY 1
+#define MONITOR_MEMORY 0
+
+#define USE_PCM 1
 
 /** Analysis **/
 #define SAVE_RELATIONS_TO_FILE 0
+
+#define SAVE_INDIVIDUAL_THREAD_TIME 0
 
 /** Algorithm Parameters **/
 #define BUCKET_SIZE 2

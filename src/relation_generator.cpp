@@ -138,6 +138,7 @@ void *create_relation_S(void * args) {
 
     uint64_t i;
     int taskSizeCounter = arg->taskSize;
+    int skewModeSwitcher = (arg->taskSize)/3+100000;
     int skewMode = 1;
     arg->relation->num_tuples = arg->relSize;
 
@@ -152,32 +153,44 @@ void *create_relation_S(void * args) {
     int mixer = 0;
 
     if (arg->skew) {
+//        std::cout << "SKEW = " << arg->skew << " skew mode switcher " << skewModeSwitcher << std::endl;
         for (i = 0; i < arg->relation->num_tuples; i++) {
+//            std::cout << "skewmode = " << skewMode << "skew mode switcher = " << skewModeSwitcher << std::endl;
+
             if (skewMode == 2) {
                 arg->relation->tuples[i].key = i;                  // matches.
+                skewModeSwitcher --;
+                if (skewModeSwitcher != 0) { skewModeSwitcher --; }
             } else if (skewMode == 1) {
-                arg->relation->tuples[i].key = arg->relation->num_tuples + i;    // not matches.
+//                arg->relation->tuples[i].key = arg->relation->num_tuples + i;    // not matches.
+                arg->relation->tuples[i].key = -1;
+                skewModeSwitcher --;
             }
             arg->relation->tuples[i].payload = i;
 
-            // Switch skewMode every taskSize tuples.
-            taskSizeCounter --;
-
-            if (taskSizeCounter == 0) {
-                taskSizeCounter = 10;
-                mixer += 1;
-                if (skewMode == 1) {
-                    if (mixer < 5) {
-                        skewMode = 1;
-                    } else {
-                        mixer = 0;
-                        skewMode = 2;
-                    }
-                }
-                else if (skewMode == 2) {
-                    skewMode = 1;
-                }
+            if (skewModeSwitcher == 0) {
+                if (skewMode == 1) { skewMode = 2; }
+                else { skewMode = 1; }
+                skewModeSwitcher = (arg->taskSize)/3+100000;
             }
+
+            // Switch skewMode every taskSize tuples.
+//            taskSizeCounter --;
+//            if (taskSizeCounter == 0) {
+//                taskSizeCounter = 10;
+//                mixer += 1;
+//                if (skewMode == 1) {
+//                    if (mixer < 5) {
+//                        skewMode = 1;
+//                    } else {
+//                        mixer = 0;
+//                        skewMode = 2;
+//                    }
+//                }
+//                else if (skewMode == 2) {
+//                    skewMode = 1;
+//                }
+//            }
         }
     } else {
 

@@ -38,6 +38,7 @@ class ThreadPool {
         void stop();
         void saveJoinedRelationToFile();
         void saveIndividualThreadResults(ThreadArg &args);
+        void saveIndividualThreadTime(Timestamps &tsThread, int idThread);
 
     private:
         int id;

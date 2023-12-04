@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import pandas as pd
 import csv
 import os
 from datetime import datetime
@@ -19,6 +20,7 @@ cache_csv_file_name = '/cache-results.csv'
 ipc_csv_file_name = '/IPC-results.csv'
 mb_csv_file_name = '/MB-results.csv'
 tresults_csv_file_name = '/individual-thread-results.csv'
+individual_thread_timing_csv_file_name = '../results-consolidated/consolidated-thread-runtimes.csv'
 
 cache_png_file_name = '/cache-results.png'
 ipc_png_file_name = '/IPC-results.png'
@@ -26,6 +28,7 @@ mb_png_file_name = '/MB-results.png'
 lmb_png_file_name = '/MB-local-results.png'
 rmb_png_file_name = '/MB-remote-results.png'
 tresults_png_file_name = '/individual-thread-results.png'
+individual_thread_timing_png_file_name = '/individual-thread-timing-results.png'
 
 nThreads = 0
 
@@ -98,6 +101,64 @@ def plotIpc(path):
         plt.savefig(path + "/plots" + ipc_png_file_name, bbox_inches='tight')
 
 
+# Individual thread timing results
+def plotThreadTimingResults(path):
+    plt.clf()
+
+    # Read the CSV file into a DataFrame
+    df = pd.read_csv(individual_thread_timing_csv_file_name, header=None, names=['runtimes'])
+
+    # Plotting
+    plt.bar(range(len(df)), df['runtimes'])
+    plt.xlabel('Thread ID')
+    plt.ylabel('Runtime (s)')
+    plt.title('Runtime of Individual Threads')
+    plt.grid()
+    plt.savefig(path + "/plots" + individual_thread_timing_png_file_name, bbox_inches='tight')
+
+
+def plotThreadResultsSkew(path):
+    plt.clf()
+    data = []
+    x_2 = []
+    x_3 = []
+
+    with open(path + tresults_csv_file_name) as csvFile:
+        rows = csv.reader(csvFile, delimiter=',')
+
+        for row in rows:
+            data.append([int(row[0]), int(row[1]), int(row[2]), int(row[3]), int(row[4])])
+
+        data.sort()
+        x, tasks, matches, matchTasks, nonMatchTasks = zip(*data)
+
+        processedTuples = tuple(x * 1000000 for x in tasks)
+
+        plt.bar(x, processedTuples, color = 'b', width = 0.25, label = "Total Processed Tuples")
+
+        for val in x:
+            x_2.append(val+0.25)
+
+        nonMatchTuples = tuple(processed - match for processed, match in zip(processedTuples, matches))
+
+        plt.bar(x_2, matches, color = 'y', width = 0.25, label = "Matches")
+        plt.bar(x_2, nonMatchTuples, bottom=matches, color = 'g', width = 0.25, label = "Non-Matches")
+
+        for val in x:
+            x_3.append(val+0.5)
+
+        max_y = max(processedTuples)
+        plt.ylim(0, max_y+8000000)
+
+        plt.xlabel('Thread ID')
+        plt.ylabel('Processed Tuples')
+        plt.title('Tuples Processed per Thread')
+        plt.legend(loc=(1.04, 0))
+        plt.grid()
+        plt.savefig(path + "/plots" + tresults_png_file_name, bbox_inches='tight')
+
+
+
 def plotThreadResults(path):
     plt.clf()
     data = []
@@ -118,15 +179,18 @@ def plotThreadResults(path):
         for val in x:
             x_2.append(val+0.25)
 
-        plt.bar(x_2, matchTasks, color = 'y', width = 0.25, label = "Match Tasks")
-        plt.bar(x_2, nonMatchTasks, bottom=matchTasks, color = 'g', width = 0.25, label = "Non Match Tasks")
+        plt.bar(x_2, matchTasks, color = 'y', width = 0.25, label = "Matches")
+        plt.bar(x_2, nonMatchTasks, bottom=matchTasks, color = 'g', width = 0.25, label = "Non-Matches")
 
         for val in x:
             x_3.append(val+0.5)
 
-        plt.xlabel('Core ID')
+        max_y = max(tasks)
+        plt.ylim(0, max_y+20)
+
+        plt.xlabel('Thread ID')
         plt.ylabel('Completed Tasks')
-        plt.title('Completed Tasks per Core')
+        plt.title('Completed Tasks per Thread')
         plt.legend(loc=(1.04, 0))
         plt.grid()
         plt.savefig(path + "/plots" + tresults_png_file_name, bbox_inches='tight')
@@ -224,22 +288,20 @@ if __name__ == "__main__":
     for directory in dirNames:
 
         directory = "../results/" + directory
-#         print("Directory = ", directory)
         plot_dir = directory + "/plots"
-#         print("plot dir =  " + plot_dir)
 
         if not os.path.exists(plot_dir):
             os.makedirs(plot_dir)
             print(f"Created folder '{plot_dir}'.")
-            plotCache(directory)            # also finds the number of rows.
-            plotIpc(directory)
-            plotThreadResults(directory)
-#             plotLocalMemBandwidth(directory)
-#             plotRemoteMemBandwidth(directory)
         else:
             print(f"Folder '{plot_dir}' already exists.")
 
-
+        plotCache(directory)            # also finds the number of rows.
+        plotIpc(directory)
+        plotThreadResultsSkew(directory)
+        plotThreadTimingResults(directory)
+#             plotLocalMemBandwidth(directory)
+#             plotRemoteMemBandwidth(directory)
 
 #     plotCache()
 #     plotIpc()

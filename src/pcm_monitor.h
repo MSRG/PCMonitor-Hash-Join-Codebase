@@ -39,6 +39,7 @@ class PcmMonitor {
         char *path;
         std::pair<double,double> ipcStats[15];
         std::pair<int,int> l2CacheStats[15];
+        std::pair<int,int> l3CacheStats[15];
         std::pair<double,double> rmbStats[15];
         std::pair<double,double> lmbStats[15];
         int threadStrikes[15];

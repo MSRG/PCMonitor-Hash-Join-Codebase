@@ -8,3 +8,6 @@ sudo rm -r *
 
 cd ../cpu-cycles/
 sudo rm -r *
+
+cd ../individual-thread-timing/
+sudo rm -r *
