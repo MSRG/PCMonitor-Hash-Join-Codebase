@@ -6,9 +6,9 @@ cd build
 #    sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=100000000 --s-size=100000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1 --hj-threads=6
 #done
 
-sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=4 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=0 --hj-threads=5
+start_time=$(date +%s.%N)
+sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=4 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=0 --hj-threads=6
 
-#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1
 
 # MEMORY SIZE EXPERIMENTS
 # 32 GB -- previous default max
@@ -52,21 +52,26 @@ sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJ
 
 
 # CONCURRENT EXPERIMENTS
-#(sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#start_time=$(date +%s.%N)
+#(
+#sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=4 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
 #(
 #sleep 4
-#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=1 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=1 --program-pmu=1) &
+#sudo perf stat -o ../cpu-cycles/cpu-cycles-1.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=1 --r-size=2000000000 --s-size=2000000000 --total-cores=4 --task-size=1000000 --skew=0 --core-pausing=1 --program-pmu=1) &
 #(
 #sleep 8
-#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=2 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=1 --program-pmu=1) &
+#sudo perf stat -o ../cpu-cycles/cpu-cycles-2.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=2 --r-size=2000000000 --s-size=2000000000 --total-cores=4 --task-size=1000000 --skew=0 --core-pausing=1 --program-pmu=1) &
 #(
 #sleep 12
-#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=3 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=1 --program-pmu=1) &
+#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=3 --r-size=2000000000 --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=1 --program-pmu=1) &
 #(
 #sleep 45
-#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=4 --r-size=2000000000  --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
+#sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=4 --r-size=2000000000 --s-size=2000000000 --total-cores=15 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=1) &
 
-
+wait
+end_time=$(date +%s.%N)
+execution_time=$(echo "$end_time - $start_time" | bc)
+echo "Execution time: $execution_time seconds"
 # LOOP EXPERIMENTS
 #for i in {1..10}
   #do
