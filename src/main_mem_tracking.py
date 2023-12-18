@@ -20,7 +20,7 @@ def track_memory_usage(file_path, duration_sec):
 
 if __name__ == "__main__":
     file_path = "memory_usage.csv"
-    duration_sec = 30  # Adjust the duration as needed
+    duration_sec = 20  # Adjust the duration as needed
 
     track_memory_usage(file_path, duration_sec)
     print(f"Memory usage data saved to {file_path}")

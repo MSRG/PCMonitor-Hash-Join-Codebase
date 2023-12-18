@@ -40,10 +40,10 @@ cd build
 # SOCKET EXPERIMENTS
 #sudo perf stat -e cpu-clock sudo ./Pool-HashJoin-PCM --id=1-8 --r-size=8500000000  --s-size=8500000000 --total-cores=4 --task-size=5000000 --skew=0 --core-pausing=0 --program-pmu=1
 
-## SERIAL EXPERIMENTS
+# SERIAL EXPERIMENTS
 #start_time=$(date +%s.%N)
-
-#sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
+#
+#sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
 #wait
 #sudo perf stat -o ../cpu-cycles/cpu-cycles-1.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=1 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
 #wait
@@ -76,6 +76,12 @@ cd build
 #sudo perf stat -o ../cpu-cycles/cpu-cycles-15.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=15 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
 #wait
 #sudo perf stat -o ../cpu-cycles/cpu-cycles-16.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=16 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
+#wait
+#sudo perf stat -o ../cpu-cycles/cpu-cycles-17.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=17 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
+#wait
+#sudo perf stat -o ../cpu-cycles/cpu-cycles-18.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=18 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
+#wait
+#sudo perf stat -o ../cpu-cycles/cpu-cycles-19.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=19 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1
 
 
 ## CONCURRENT EXPERIMENTS
@@ -99,7 +105,7 @@ start_time=$(date +%s.%N)
   (
   sudo perf stat -o ../cpu-cycles/cpu-cycles-8.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=8 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1) &
   (
-  sudo perf stat -o ../cpu-cycles/cpu-cycles-9.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=9 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=1 --program-pmu=1) &
+  sudo perf stat -o ../cpu-cycles/cpu-cycles-9.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=9 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1) &
   (
   sudo perf stat -o ../cpu-cycles/cpu-cycles-10.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=10 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=1 --program-pmu=1) &
   (
@@ -114,14 +120,14 @@ start_time=$(date +%s.%N)
   sudo perf stat -o ../cpu-cycles/cpu-cycles-15.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=15 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=1 --program-pmu=1) &
   (
   sudo perf stat -o ../cpu-cycles/cpu-cycles-16.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=16 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=1 --program-pmu=1) &
-
-# -- 17
+#
+## -- 17
 #  (
-#  sudo perf stat -o ../cpu-cycles/cpu-cycles-17.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=17 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  sudo perf stat -o ../cpu-cycles/cpu-cycles-17.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=17 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1) &
 #  (
-#  sudo perf stat -o ../cpu-cycles/cpu-cycles-18.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=18 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  sudo perf stat -o ../cpu-cycles/cpu-cycles-18.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=18 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1) &
 #  (
-#  sudo perf stat -o ../cpu-cycles/cpu-cycles-19.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=19 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1) &
+#  sudo perf stat -o ../cpu-cycles/cpu-cycles-19.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=19 --r-size=1000 --s-size=2000000000 --total-cores=4 --monitor-cores=4 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=0 --program-pmu=1) &
 #  (
 #  sudo perf stat -o ../cpu-cycles/cpu-cycles-20.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=20 --r-size=1000 --s-size=1000000000 --total-cores=4 --monitor-cores=15 --task-size=1000000 --hj-threads=0 --share-hash-table=0 --skew=0 --core-pausing=1 --program-pmu=1) &
 #  (
