@@ -7,7 +7,7 @@ cd build
 #done
 
 start_time=$(date +%s.%N)
-sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=4 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=0 --hj-threads=6
+sudo perf stat -o ../cpu-cycles/cpu-cycles-0.txt -e cpu-cycles sudo ./Pool-HashJoin-PCM --id=0 --r-size=2000000000 --s-size=2000000000 --total-cores=4 --task-size=1000000 --skew=0 --core-pausing=0 --program-pmu=0 --hj-threads=7
 
 
 # MEMORY SIZE EXPERIMENTS
