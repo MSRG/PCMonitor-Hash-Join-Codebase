@@ -49,7 +49,6 @@ def plotCache(path):
 
         # Find number of threads in the file:
         nThreads = len(next(rows)) # Read first line and count columns
-#         print(nThreads)
         csvFile.seek(0)
 
         for row in rows:
@@ -80,7 +79,6 @@ def plotIpc(path):
 
 #         Find number of threads in the file:
         nThreads = len(next(rows)) # Read first line and count columns
-#         print(nThreads)
         csvFile.seek(0)
 
         for row in rows:
@@ -156,7 +154,6 @@ def plotThreadResultsSkew(path):
         plt.legend(loc=(1.04, 0))
         plt.grid()
         plt.savefig(path + "/plots" + tresults_png_file_name, bbox_inches='tight')
-
 
 
 def plotThreadResults(path):

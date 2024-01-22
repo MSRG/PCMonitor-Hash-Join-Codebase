@@ -11,7 +11,6 @@
 #include <stdlib.h>
 
 #include "pcm_monitor.h"
-//#include "cpu_mapping.h"        /* get_cpu_id */
 #include "config.h"             /* ENABLE_CORE_PAUSING */
 
 const char * CACHE_PATH = "cache-results.csv";
@@ -59,14 +58,9 @@ PcmMonitor::PcmMonitor(int totalCoresUsed_, int totalCoresMonitored_, bool coreP
     }
 }
 
-PcmMonitor::~PcmMonitor(void) {
-//  std::cout << "PcmMonitor is being deleted" << std::endl;
-//   free(path);
-//    delete[] this->path;
-}
+PcmMonitor::~PcmMonitor(void) {}
 
 void PcmMonitor::setUpMonitoring() {
-//    std::cout << "setUpMonitoring" << std::endl;
     uint32 core = 0;
     PCM * m = PCM::getInstance();
     PCM::ErrorCode status;
@@ -104,8 +98,7 @@ void PcmMonitor::makeStopDecisions() {
     int maxStrikesTolerance = 5;
 
     // NOTE: core 0 is not allowed to stop.
-    // HERE: set which cores are allowed to stop at all
-
+    // Set which cores are allowed to stop at all.
     for (int i = 1; i < 4; i++) {
         if (threadStrikes[i] > maxStrikesTolerance) {
             threadStop[i] = true;
@@ -115,6 +108,7 @@ void PcmMonitor::makeStopDecisions() {
         }
     }
 
+// Alternative strike setting methods.
 //    if (id == 1) { // pause: use 15 for all.
 //         for (int i = 1; i < 8; i++) {
 //             if (threadStrikes[i] > maxStrikesTolerance) {
@@ -125,7 +119,6 @@ void PcmMonitor::makeStopDecisions() {
 //             }
 //         }
 //    }
-//
 //    if (id == 2) { // pause: 5, 6, 7, 8
 //         for (int i = 5; i < 9; i++) {
 //             if (threadStrikes[i] > maxStrikesTolerance) {
@@ -136,7 +129,6 @@ void PcmMonitor::makeStopDecisions() {
 //             }
 //         }
 //    }
-//
 //    if (id == 3) { // pause: 9, 10, 11, 12
 //         for (int i = 9; i < 13; i++) {
 //             if (threadStrikes[i] > maxStrikesTolerance) {
@@ -147,7 +139,6 @@ void PcmMonitor::makeStopDecisions() {
 //             }
 //         }
 //    }
-
 //    for (int i = 10; i < 14; i++) {
 //        if (threadStrikes[i] > maxStrikesTolerance) {
 //            threadStop[i] = true;
@@ -181,24 +172,20 @@ void PcmMonitor::analyzeCacheStats() {
 
 
         // CASE A: Difference between previous and current value exceed max allowable diff.
-        // Add a strike to each core with a high diff.
-        // TODO: could alternatively just stop the core.
+        // Add a strike to each core with a high diff. (Could alternatively just stop the core.)
 //        if ((l2CacheStats[i].second - l2CacheStats[i].first) > maxDiff) {
 //            threadStrikes[i] += 1;
 //            if (threadStrikes[i] == maxStrikes) {
-//                threadStop[i] = false; // TODO: change to true.
+//                threadStop[i] = false;
 //            }
 //        }
-
         // CASE B: Current value is higher than pre-defined allowable threshold.
         // Stop the core(s) exceeding the threshold value.
-//        // TODO: could add a strike.
 //        if (l2CacheStats[i].second > threshold) {
 //            threadStrikes[i] += 1;
 //        } else {
 //            threadStrikes[i] -= 1;
 //        }
-
         // CASE C: Identify which core is performing the worst among all cores.
 //        if (l2CacheStats[i].second > worstValue) {
 //            worstValue = l2CacheStats[i].second;
@@ -219,21 +206,7 @@ void PcmMonitor::runMonitoring() {
         if (corePausing) { makeStopDecisions(); }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
-//    memBandwidthFlag = false;
-//    saveMemoryBandwidthValues();
 }
-
-
-/*
- * Thread/core 15.
-*/
-void PcmMonitor::runAnalyzing() {
-    while (monitoring) {
-//        analyzeCacheStats();
-//        makeStopDecisions();
-    }
-}
-
 
 void PcmMonitor::createResultsFolder() {
     char * path;
@@ -324,28 +297,24 @@ void PcmMonitor::saveIpcValues() {
 }
 
 void PcmMonitor::saveMemoryBandwidthValues() {
+    std::ofstream file(this->path + std::string(MB_CSV), std::ios_base::app);
 
-//    if (!memBandwidthFlag) {
-        std::ofstream file(this->path + std::string(MB_CSV), std::ios_base::app);
+    for (int i = 0; i < totalCoresMonitored; i++) {
+        if (!i == 0) { file << ","; }
+        double localMemBdwth = getLocalMemoryBW(coreBeforeState[i], coreAfterState[i]);
+        file << localMemBdwth;
+        file << ",";
+        double remoteMemBdwth = getRemoteMemoryBW(coreBeforeState[i], coreAfterState[i]);
+        file << remoteMemBdwth;
 
-        for (int i = 0; i < totalCoresMonitored; i++) {
-            if (!i == 0) { file << ","; }
-            double localMemBdwth = getLocalMemoryBW(coreBeforeState[i], coreAfterState[i]);
-            file << localMemBdwth;
-            file << ",";
-            double remoteMemBdwth = getRemoteMemoryBW(coreBeforeState[i], coreAfterState[i]);
-            file << remoteMemBdwth;
+        lmbStats[i].first = lmbStats[i].second;
+        lmbStats[i].second = localMemBdwth;
 
-            lmbStats[i].first = lmbStats[i].second;
-            lmbStats[i].second = localMemBdwth;
-
-            rmbStats[i].first = rmbStats[i].second;
-            rmbStats[i].second = remoteMemBdwth;
-        }
-        file << "\n";
-        file.close();
-//        memBandwidthFlag = true;
-//    }
+        rmbStats[i].first = rmbStats[i].second;
+        rmbStats[i].second = remoteMemBdwth;
+    }
+    file << "\n";
+    file.close();
 }
 
 /*
@@ -383,31 +352,17 @@ void PcmMonitor::startMonitorThread() {
     pthread_attr_t attr;
     pthread_attr_init(&attr);
 
-    // THREAD #1 (ID = 54), COLLECT STATISTICS.
     cpu_idx = 15;
-//    cpu_idx = get_cpu_id(15);
     CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
     CPU_SET(cpu_idx, &set);         // Add CPU cpu to set.
 
     pcmThreads.emplace_back(&PcmMonitor::runMonitoring, this);
     rv = pthread_setaffinity_np(pcmThreads.back().native_handle(), sizeof(cpu_set_t), &set);
-    if (rv != 0) {
-      std::cerr << "Error calling pthread_setaffinity_np: " << rv << "\n";
-    }
-
-    // THREAD #2 (ID = 15), ANALYZE STATISTICS.
-//    cpu_idx = get_cpu_id(15);
-//    CPU_ZERO(&set);                 // Clears set, so that it contains no CPUs.
-//    CPU_SET(cpu_idx, &set);         // Add CPU cpu to set.
-//
-//    pcmThreads.emplace_back(&PcmMonitor::runAnalyzing, this);
-//    rv = pthread_setaffinity_np(pcmThreads.back().native_handle(), sizeof(cpu_set_t), &set);
-//    if (rv != 0) {
-//      std::cerr << "Error calling pthread_setaffinity_np: " << rv << "\n";
-//    }
+    if (rv != 0) { std::cerr << "Error calling pthread_setaffinity_np: " << rv << "\n"; }
 }
 
 void PcmMonitor::joinMonitorThread() {
+//    allowAllThreadsToContinue();
 //    allowAllThreadsToContinue();
     for (std::thread & t : pcmThreads) {
         t.join();

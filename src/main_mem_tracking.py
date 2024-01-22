@@ -8,7 +8,6 @@ def track_memory_usage(file_path, duration_sec):
 
         f.write("Time (s),Memory Usage (MB),Memory Usage (%)\n")
 
-#         while time.time() < end_time:
         while 1:
             memory_usage = psutil.virtual_memory().used / (1024 ** 2)  # Convert to MB
             memory_percentage = psutil.virtual_memory()[2]

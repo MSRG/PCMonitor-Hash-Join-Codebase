@@ -21,7 +21,6 @@ class PcmMonitor {
         bool shouldThreadStop(int id);
         void runMonitoring();
         void analyzeCacheStats();
-        void runAnalyzing();
         void checkpointPerformanceCounters();
         void startMonitorThread();
         void saveCacheValues();

@@ -12,7 +12,6 @@
 #include <condition_variable>
 
 #include "config.h"
-//#include "global_hash_table.h"
 
 // Tuple keys & values are 64-bits (8 bytes) each —> 16 bytes per tuple.
 typedef         int64_t             intkey_t;
@@ -39,7 +38,6 @@ typedef struct GlobalHashTable      GlobalHashTable;
 typedef struct FineGrainedLock      FineGrainedLock;
 
 typedef struct Timestamps           Timestamps;
-
 
 using namespace std::chrono;
 
@@ -72,7 +70,6 @@ struct Relation {
     uint64_t  num_tuples; // int64_t = 8 bytes
 };
 
-
 /**************************** HASHTABLE STRUCTS ****************************/
 
 /**
@@ -103,9 +100,7 @@ struct BucketBuffer {
     Bucket      buf[OVERFLOW_BUF_SIZE];
 };
 
-
 /**************************** RESULT STRUCTS ****************************/
-
 
 /** Holds the join results of a thread */
 struct ThreadResult {
@@ -120,9 +115,7 @@ struct JoinResults {
     ChainedTupleBuffer * chainedTupBuf;
 };
 
-
 /**************************** CHAINED TUPLE BUFFER ****************************/
-
 
 struct TupleBuffer {
     ChainTuple * tuples;
@@ -218,6 +211,5 @@ struct FineGrainedLock {
     pthread_mutex_t fineLock;
 //    std::mutex fineLock;
 };
-
 
 #endif //POOL_HASHJOIN_PCM_TYPES_H

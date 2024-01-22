@@ -22,7 +22,6 @@ def parse_and_copy(directory_path, output_file):
     for root, dirs, files in os.walk(directory_path):
         for file in files:
             file_path = os.path.join(root, str(file))
-#             copy_csv_contents(file_path, output_file)
             copy_line(file_path, output_file)
 
 if __name__ == "__main__":

@@ -197,14 +197,10 @@ void getGlobalHt(GlobalHashTable * globalHt, int numBuckets) {
     unique_lock<mutex> lock(globalHtMutex);
 
     // Hash table exists and is ready to use!
-    if (globalHt->ready) {
-//        cout << "GLOBAL HASH TABLE IS READY FOR ME!" << endl;
-        return;
-        }
+    if (globalHt->ready) { return; }
 
     // Not built, and no one is building it, so I will build it.
     if (!globalHt->ready && !globalHt->beingBuilt) {
-//        cout << "I AM BUILDING THE GLOBAL HASH TABLE!" << endl;
         globalHt->beingBuilt = true;
         allocate_hashtable(&globalHt->ht, numBuckets);
         return;
@@ -212,13 +208,9 @@ void getGlobalHt(GlobalHashTable * globalHt, int numBuckets) {
 
     // Someone else is building the hash table, it is not ready.
     if (globalHt->beingBuilt && !globalHt->ready) {
-
         lock.unlock();
-
         // Wait until the hash table is ready.
-        while (!globalHt->ready) {
-//            cout << "WAITING FOR GLOBAL HASH TABLE" << endl;
-        }
+        while (!globalHt->ready) {}
         return;
     }
 }
@@ -267,7 +259,6 @@ void threaded_hash_join(HashJoinThreadArg * args) {
     std::cout << "Available memory for this hash join = " << memAvailable << " GB." << std::endl;
 
 #if MONITOR_MEMORY==1 // -------------------- MEMORY USE MONITORING -------------------------
-//    while ((400000000000 - getUsedMemory(id, 0)) < memRequired) { }
     while (!isMemAvailable(memRequiredGB)) { }
 #endif  // ----------------------------------------------------------------------------------
 
@@ -281,7 +272,6 @@ void threaded_hash_join(HashJoinThreadArg * args) {
     auto tm = *std::localtime(&t);
     std::ostringstream oss;
     oss << std::put_time(&tm, "%d-%m-%Y-");
-//    oss << std::put_time(&tm, "%d-%m-%Y--%H:%M:%S--");
     oss << id;
     auto datetimeStr = oss.str();
     const char * datetime = datetimeStr.c_str();
@@ -331,12 +321,7 @@ void threaded_hash_join(HashJoinThreadArg * args) {
             threadPool.saveJoinedRelationToFile();
 #endif
 
-        std::cout << "free stuff.." << std::endl;
-    //    free(relR.tuples);
-    //    free(relS.tuples);
-    //    free(path);
-    //    deallocate_hashtable(*globalht->ht);
-        std::cout << "DONE! BYE!" << std::endl;
+        std::cout << "DONE. BYE!" << std::endl;
 
     // --------------- Each thread uses an individual hash table --------------------
     } else {
@@ -370,14 +355,7 @@ void threaded_hash_join(HashJoinThreadArg * args) {
 #if SAVE_RELATIONS_TO_FILE==1
         threadPool.saveJoinedRelationToFile();
 #endif
-
-        std::cout << "free stuff.." << std::endl;
-        //    free(relR.tuples);
-        //    free(relS.tuples);
-        //    free(path);
-        //    deallocate_hashtable(*globalht->ht);
-        std::cout << "DONE! BYE!" << std::endl;
-
+        std::cout << "DONE. BYE!" << std::endl;
     }
 }
 
@@ -535,6 +513,54 @@ void threaded_hash_join_copy(HashJoinThreadArg * args) {
 //    }
 }
 
+/*
+* Function for testing L2 cache.
+* Function to perform computation on a 256KB data structure.
+*/
+void* performComputationOnLargeDataStructure(void* arg) {
+
+    int threadID = *((int*)arg);
+
+    // Set thread affinity to core 0
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(0, &cpuset);
+
+    if (pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset) != 0) {
+        std::cerr << "Error setting thread affinity for thread " << threadID << std::endl;
+    }
+
+    std::cout << "Thread " << threadID << " is executing on core 0." << std::endl;
+
+   // Size of the data structure in bytes (256KB)
+    const int sizeInBytes = 256 * 1024;
+
+    // Allocate memory for the data structure (assuming it's an array of integers)
+    int* dataStructure = new int[sizeInBytes / sizeof(int)];
+
+    // Assuming the data structure is an array of integers
+    int numElements = sizeInBytes / sizeof(int);
+
+    // Initialize the array with random values for demonstration purposes
+    for (int i = 0; i < numElements; ++i) {
+        dataStructure[i] = rand() % 100; // Random values between 0 and 99
+    }
+
+    int sum = 0;
+    for (int j = 0; j < 100000; j++) {
+        sum = 0;
+        // Perform computation (sum all elements in the array)
+        for (int i = 0; i < numElements; ++i) {
+            sum += dataStructure[i];
+        }
+    }
+
+    // Print the result (you can modify this part based on your actual computation)
+    std::cout << "Sum of elements in the data structure: " << sum << std::endl;
+
+    delete[] dataStructure;
+}
+
 
 // ***********************************************************************************************************
 //                                                Main
@@ -636,7 +662,6 @@ int main(int argc, char **argv) {
         auto t = std::time(nullptr);
         auto tm = *std::localtime(&t);
         std::ostringstream oss;
-//        oss << std::put_time(&tm, "%d-%m-%Y--%H:%M:%S--");
         oss << std::put_time(&tm, "%d-%m-%Y--");
         oss << cmdParams.id;
         auto datetimeStr = oss.str();
@@ -656,13 +681,12 @@ int main(int argc, char **argv) {
         const char * tmp = "/";
         strcat(path, tmp);
 
-PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.coresToMonitor, cmdParams.corePausing, path, cmdParams.id);
+        PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.coresToMonitor, cmdParams.corePausing, path, cmdParams.id);
 
 #if USE_PCM==1
         printf("[INFO] Initializing PCM Monitor...\n");
         pcmMonitor.setUpMonitoring();
 #endif
-
         printf("[INFO] Initializing Hashtable...\n");
         Hashtable * individualHt;
         uint64_t numBuckets = (relR.num_tuples / BUCKET_SIZE); // BUCKET_SIZE = 2
@@ -678,6 +702,32 @@ PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.coresToMonitor, cmdParams.
         pcmMonitor.startMonitorThread();
 #endif
 
+// THIS WAS USED FOR MULTI-THREAD L2 CACHE EXPERIMENTS.
+// ------------------------------------------------------------------------------------
+//    const int numThreads = 12; // Change the number of threads as needed
+//
+//    pthread_t threads[numThreads];
+//    int threadIDs[numThreads];
+//
+//    // Create threads
+//    for (int i = 0; i < numThreads; ++i) {
+//        threadIDs[i] = i;
+//        if (pthread_create(&threads[i], nullptr, performComputationOnLargeDataStructure, &threadIDs[i]) != 0) {
+//            std::cerr << "Error creating thread " << i << std::endl;
+//            return 1; // Return with an error code
+//        }
+//    }
+//    // Wait for threads to finish
+//    for (int i = 0; i < numThreads; ++i) {
+//        if (pthread_join(threads[i], nullptr) != 0) {
+//            std::cerr << "Error joining thread " << i << std::endl;
+//            return 1; // Return with an error code
+//        }
+//    }
+//
+//    std::cout << "All threads have finished execution." << std::endl;
+// ------------------------------------------------------------------------------------
+
         printf("[INFO] Initializing ThreadPool...\n");
         ThreadPool threadPool(cmdParams.totalCores, relR, relS, individualGlobalHt, cmdParams.taskSize, buildQ, probeQ, pcmMonitor, path, cmdParams.id);
         threadPool.populateQueues();
@@ -691,13 +741,7 @@ PcmMonitor pcmMonitor(cmdParams.totalCores, cmdParams.coresToMonitor, cmdParams.
 #if SAVE_RELATIONS_TO_FILE==1
         threadPool.saveJoinedRelationToFile();
 #endif
-
-        std::cout << "free stuff.." << std::endl;
-//        free(relR.tuples);
-//        free(relS.tuples);
-//        free(path);
-//        deallocate_hashtable(*ht);
-        std::cout << "DONE! BYE!" << std::endl;
+        std::cout << "DONE. BYE!" << std::endl;
     return 0;
 
     }
@@ -789,7 +833,6 @@ void parse_args(int argc, char **argv, CmdParams * cmdParams) {
                 break;
         }
     }
-
     /* Print any remaining command line arguments (not options). */
     if (optind < argc) {
         printf ("non-option arguments: ");

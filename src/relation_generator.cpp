@@ -17,13 +17,9 @@
 #include "cpu_mapping.h"        /* get_cpu_id() */
 #include "join_params.h"
 
-//#define MALLOC(SZ) alloc_aligned(SZ+RELATION_PADDING) /*malloc(SZ+RELATION_PADDING)*/
-
 #define MALLOC(SZ) alloc_aligned(SZ) /*malloc(SZ)*/
 
 void * alloc_aligned(size_t size) {
-//    std::cout << "Allocating " << size << " bytes of memory for relation, using alignment of " << CACHE_LINE_SIZE << std::endl;
-
     void * ret;
     int rv;
     // Allocates size bytes and places the address of the allocated memory in ret.
@@ -68,7 +64,6 @@ void *fillRelation(void *args) {
 * @relation: relR passed by reference to create new relations.
 * @num_tuples: r_size parameter
 */
-//void *create_relation_R(Relation *relation, uint64_t num_tuples) {
 void *create_relation_R(void * args) {
     RelCreationThreadArg * arg = (RelCreationThreadArg *) args;
 
@@ -76,7 +71,6 @@ void *create_relation_R(void * args) {
     arg->relation->num_tuples = arg->relSize;
 
     std::cout << "Rel R size = " << arg->relSize << " = " <<  arg->relation->num_tuples << std::endl;
-//    std::cout << "Mallocing: rel size = " << arg->relSize << " size of tuple = " << sizeof(Tuple) << " when multiplied is: " << (arg->relSize * sizeof(Tuple)) << std::endl;
 
     // We need aligned allocation of items.
     arg->relation->tuples = (Tuple*) MALLOC(arg->relSize * sizeof(Tuple));
@@ -84,7 +78,7 @@ void *create_relation_R(void * args) {
         perror("out of memory");
     }
 
-//     Now fill in the relation in parallel.
+//  Now fill in the relation in parallel.
     int numFillThreads = 14;
     uint64_t partitionSize = arg->relSize / numFillThreads - 1;
     uint64_t start = 0;
@@ -108,12 +102,6 @@ void *create_relation_R(void * args) {
     for (int j = 0; j < numFillThreads; j++) {
         pthread_join(threads[j], NULL);
     }
-
-//  Old single-threaded relation filling.
-//    for (i = 0; i < arg->relation->num_tuples; i++) {
-//        arg->relation->tuples[i].key     = i;
-//        arg->relation->tuples[i].payload = i;
-//    }
 
     std::cout << "Done filling relations!" << std::endl;
 
@@ -153,16 +141,13 @@ void *create_relation_S(void * args) {
     int mixer = 0;
 
     if (arg->skew) {
-//        std::cout << "SKEW = " << arg->skew << " skew mode switcher " << skewModeSwitcher << std::endl;
         for (i = 0; i < arg->relation->num_tuples; i++) {
-//            std::cout << "skewmode = " << skewMode << "skew mode switcher = " << skewModeSwitcher << std::endl;
 
             if (skewMode == 2) {
                 arg->relation->tuples[i].key = i;                  // matches.
                 skewModeSwitcher --;
                 if (skewModeSwitcher != 0) { skewModeSwitcher --; }
             } else if (skewMode == 1) {
-//                arg->relation->tuples[i].key = arg->relation->num_tuples + i;    // not matches.
                 arg->relation->tuples[i].key = -1;
                 skewModeSwitcher --;
             }
@@ -173,24 +158,6 @@ void *create_relation_S(void * args) {
                 else { skewMode = 1; }
                 skewModeSwitcher = (arg->taskSize)/3+100000;
             }
-
-            // Switch skewMode every taskSize tuples.
-//            taskSizeCounter --;
-//            if (taskSizeCounter == 0) {
-//                taskSizeCounter = 10;
-//                mixer += 1;
-//                if (skewMode == 1) {
-//                    if (mixer < 5) {
-//                        skewMode = 1;
-//                    } else {
-//                        mixer = 0;
-//                        skewMode = 2;
-//                    }
-//                }
-//                else if (skewMode == 2) {
-//                    skewMode = 1;
-//                }
-//            }
         }
     } else {
 
@@ -218,13 +185,6 @@ void *create_relation_S(void * args) {
         for (int j = 0; j < numFillThreads; j++) {
             pthread_join(threads[j], NULL);
         }
-
-
-//  Old single-threaded relation filling.
-//        for (i = 0; i < arg->relation->num_tuples; i++) {
-//            arg->relation->tuples[i].key     = i;
-//            arg->relation->tuples[i].payload = i;
-//        }
         std::cout << "Done filling relations!" << std::endl;
     }
 

@@ -15,7 +15,6 @@ void FineGrainedQueue::enqueue(QueueTask task) {
     FineGrainedLock taskLock;                           // new lock for this task.
     pthread_mutex_init(&taskLock.fineLock, NULL);
 
-//    std::cout << sizeof(taskLock) << std::endl;       // 64 bytes.
     // Create pairs.
     std::pair<std::pair<bool, FineGrainedLock>, QueueTask> lockTaskPair; // new pair for the task vector.
     std::pair<bool, FineGrainedLock> lockPair;
@@ -55,7 +54,6 @@ bool FineGrainedQueue::dequeue(QueueTask &task, int &lastTaskVectorPosition) {
 }
 
 bool FineGrainedQueue::isQueueEmpty() {
-    // TODO Implement!
     return true;
 }
 

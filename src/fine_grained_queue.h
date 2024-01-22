@@ -19,9 +19,7 @@ class FineGrainedQueue {
 
     private:
         double numOfTasks;
-//        std::vector<QueueTask> queueVector;
         std::vector<std::pair<std::pair<bool,FineGrainedLock>, QueueTask>> queueVector;
-
 };
 
 #endif

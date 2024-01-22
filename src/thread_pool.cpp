@@ -131,10 +131,7 @@ void ThreadPool::saveIndividualThreadTime(Timestamps &tsThread, int idThread) {
     // Minutes
     double totalDiffMin = totalDiffSec/60;
 
-//    std::cout << "saving individual thread timing! " << totalDiffSec << "  " << idThread << std::endl;
-
     std::string path = "../individual-thread-timing/thread-" + std::to_string(idThread);
-
     std::ofstream file(path, std::ios_base::app);
     file << totalDiffSec;
 }
@@ -168,6 +165,7 @@ void ThreadPool::freeThreadsIfBuildQueueEmpty() {
     }
 }
 
+
 void ThreadPool::freeThreadsIfProbeQueueEmpty() {
     if (probeQ->isQueueEmpty()) {
         for (int i = 0; i <= numThreads; i++) {
@@ -175,6 +173,7 @@ void ThreadPool::freeThreadsIfProbeQueueEmpty() {
         }
     }
 }
+
 
 bool ThreadPool::checkThreadStatusDuringBuild(ThreadArg &args) {
     if (!pcmMonitor->shouldThreadStop(args.tid)) {
@@ -191,6 +190,7 @@ bool ThreadPool::checkThreadStatusDuringBuild(ThreadArg &args) {
         return true;
     }
 }
+
 
 bool ThreadPool::checkThreadStatusDuringProbe(ThreadArg &args) {
     if (!pcmMonitor->shouldThreadStop(args.tid)) {
@@ -210,16 +210,9 @@ bool ThreadPool::checkThreadStatusDuringProbe(ThreadArg &args) {
 
 void ThreadPool::run(ThreadArg * args) {
 
-//    pthread_mutex_lock(&results_lock);
-//    std::cout << "Running Thread #" << args->tid << ": on CPU " << sched_getcpu() << "\n";
-//    pthread_mutex_unlock(&results_lock);
-
     init_bucket_buffer(&args->overflowBuf);
 
-    if (args->tid == 0) {
-//        std::cout << "saving startTime" << std::endl;
-        gettimeofday(&(ts.startTime), NULL);
-    }
+    if (args->tid == 0) { gettimeofday(&(ts.startTime), NULL); }
 
 #if SAVE_INDIVIDUAL_THREAD_TIME==1
     // Save individual thread's timestamp.
@@ -227,7 +220,6 @@ void ThreadPool::run(ThreadArg * args) {
 #endif
 
     if (!args->globalHt->ready) { // Only build if it is not already ready.
-//        std::cout << "I AM IN THE BUILD PHASE" << std::endl;
         while (checkThreadStatusDuringBuild(*args)) {
             if (buildQ->dequeue(*(args->task), args->lastTaskVectorPosition)) {
                 (args->task->function)(*args);
@@ -236,15 +228,10 @@ void ThreadPool::run(ThreadArg * args) {
         args->globalHt->ready = true;
         args->globalHt->beingBuilt = false;
     }
-//    else { std::cout << "I GET TO SKIP THE BUILD PHASE HEHEHE: " << args->tid << std::endl; }
-
 //    freeThreadsIfBuildQueueEmpty();
     pthread_barrier_wait(args->barrier);
 
-    if (args->tid == 0) {
-//        std::cout << "saving buildPhaseEnd" << std::endl;
-        gettimeofday(&(ts.buildPhaseEnd), NULL);
-    }
+    if (args->tid == 0) { gettimeofday(&(ts.buildPhaseEnd), NULL); }
 
     // Reset the task vector pointer for the probe phase.
     args->lastTaskVectorPosition = -1;
@@ -257,8 +244,8 @@ void ThreadPool::run(ThreadArg * args) {
         }
 //    }
 
-    // the first thread to reach here means that it tried to get something from the queue and couldn't.
-    // so there are no tasks left to get. so its fine to free the other threads.
+    // The first thread to reach here means that it tried to get something from the queue and couldn't.
+    // So there are no tasks left to get. so its fine to free the other threads.
     freeThreadsIfProbeQueueEmpty();
     pthread_barrier_wait(args->barrier);
 
@@ -297,8 +284,6 @@ void ThreadPool::start() {
         printf("Couldn't create the barrier\n");
         exit(EXIT_FAILURE);
     }
-
-//    std::cout << "****** number of threads = " << numThreads << std::endl;
 
     for (i = 0; i < numThreads; i++) {
         int cpu_idx = get_cpu_id(i);
@@ -339,11 +324,13 @@ void ThreadPool::start() {
     pthread_barrier_destroy(&barrier);
 }
 
+
 void ThreadPool::stop() {
     for (std::thread & t : threads) {
         t.join();
     }
 }
+
 
 void ThreadPool::saveJoinedRelationToFile() {
     std::cout << "Saving timing results to file." << std::endl;
